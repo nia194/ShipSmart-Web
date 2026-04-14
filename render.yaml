@@ -1,0 +1,37 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ShipSmart-Web — Render Blueprint
+# React frontend (Static Site on CDN).
+#
+# BEFORE DEPLOYING: Set sync:false env vars in the Render dashboard.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  - type: web
+    name: shipsmart-web
+    env: static
+    buildCommand: corepack enable && pnpm install && pnpm build
+    staticPublishPath: dist
+    pullRequestPreviewsEnabled: true
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      - key: VITE_JAVA_API_BASE_URL
+        value: https://shipsmart-api-java.onrender.com
+      - key: VITE_PYTHON_API_BASE_URL
+        value: https://shipsmart-api-python.onrender.com
+      - key: VITE_APP_ENV
+        value: production
+      # Feature flags — Java backend default in production.
+      # Set any to "false" to fall back to Supabase edge functions.
+      - key: VITE_USE_JAVA_QUOTES
+        value: "true"
+      - key: VITE_USE_JAVA_SAVED_OPTIONS
+        value: "true"
+      - key: VITE_USE_JAVA_BOOKING_REDIRECT
+        value: "true"
