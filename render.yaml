@@ -11,7 +11,7 @@ services:
     env: static
     buildCommand: corepack enable && pnpm install && pnpm build
     staticPublishPath: dist
-    pullRequestPreviewsEnabled: true
+    pullRequestPreviewsEnabled: false
     routes:
       - type: rewrite
         source: /*
