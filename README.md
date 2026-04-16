@@ -27,24 +27,38 @@ Python AI/orchestration API.
 
 ```
 src/
-├── main.tsx                React entry
-├── App.tsx                 Router shell
-├── pages/                  Route components
-├── components/             Shared UI (shadcn/ui based)
+├── main.tsx                       React entry
+├── App.tsx                        Router shell
+├── pages/                         Route components (Home, Auth, Advisor, Saved, NotFound)
+├── components/                    Shared UI (shadcn/ui based)
+├── contexts/
+│   └── AuthContext.tsx            Supabase session + auth helpers
+├── integrations/
+│   └── supabase/                  Generated Supabase client + DB types
+│       ├── client.ts
+│       └── types.ts
 ├── lib/
-│   ├── supabase.ts         Supabase client (uses VITE_SUPABASE_*)
-│   ├── java-api.ts         Java fetch helpers (quotes, saved options, bookings)
-│   └── advisor-api.ts      Python fetch helpers (advisors, RAG, recommendations)
+│   ├── advisor-api.ts             Python fetch helpers (advisors, RAG, recommendations)
+│   ├── ai-types.ts                Advisor/RAG response shapes
+│   ├── shipping-data.ts           Static carrier/service reference data
+│   └── utils.ts
 ├── config/
-│   └── api.ts              Reads VITE_JAVA_API_BASE_URL and VITE_PYTHON_API_BASE_URL
-├── hooks/                  TanStack Query wrappers
-└── shared/types/           Canonical domain types (Shipment, Quote, SavedOption, etc.)
+│   └── api.ts                     Base URLs + feature flags + endpoint helpers (javaApi/pythonApi)
+├── hooks/                         TanStack Query wrappers
+│   ├── useShippingQuotes.ts       Java /quotes (or Supabase edge fn fallback)
+│   ├── useSavedOptions.ts         Java /saved-options (or Supabase edge fn fallback)
+│   └── useRecommendation.ts       Python /advisor/recommendation
+└── shared/types/                  Canonical domain types (Shipment, Quote, SavedOption, etc.)
 ```
 
-Both API helpers attach the Supabase access token automatically when
-the user is signed in. The same token is accepted by both backends
-(Supabase HS256 JWT validated by Java's `JwtAuthFilter`, and forwarded
-by Python to Java when the recommendation hydration path runs).
+API hooks attach the Supabase access token automatically when the user
+is signed in. The same token is accepted by both backends (Supabase
+HS256 JWT validated by Java's `JwtAuthFilter`, and forwarded by Python
+to Java when the recommendation hydration path runs).
+
+Each Java-backed feature has a `VITE_USE_JAVA_*` flag (see env vars
+below). When the flag is `false`, the corresponding hook falls back to
+the legacy Supabase edge function path.
 
 ---
 
@@ -75,6 +89,11 @@ VITE_SUPABASE_ANON_KEY=<anon key — Settings → API in Supabase>
 VITE_JAVA_API_BASE_URL=http://localhost:8080
 VITE_PYTHON_API_BASE_URL=http://localhost:8000
 VITE_APP_ENV=development
+
+# Feature flags — set to "false" to fall back to Supabase edge functions.
+VITE_USE_JAVA_QUOTES=true
+VITE_USE_JAVA_SAVED_OPTIONS=true
+VITE_USE_JAVA_BOOKING_REDIRECT=true
 ```
 
 Without `VITE_SUPABASE_ANON_KEY` the Supabase client cannot initialize
@@ -111,7 +130,11 @@ pnpm lint
 When the Java or Python APIs change shape, update these files in
 lockstep:
 
-- `src/lib/java-api.ts` ↔ Java controller DTOs
+- `src/config/api.ts` (`javaApi` / `pythonApi` helpers) ↔ Java/Python
+  route paths
+- `src/hooks/useShippingQuotes.ts`, `useSavedOptions.ts`,
+  `useRecommendation.ts` ↔ Java controller DTOs and Python advisor
+  schemas they call
 - `src/lib/advisor-api.ts` ↔ Python `app/schemas/advisor.py` and
   `app/api/routes/orchestration.py`
 - `src/shared/types/` for canonical domain types (Shipment, Quote, SavedOption, etc.)
