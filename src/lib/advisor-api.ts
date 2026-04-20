@@ -1,9 +1,13 @@
 /**
  * Advisor API Service Layer
  * Provides typed wrappers for FastAPI advisor endpoints.
+ *
+ * Uses the shared http() wrapper so every outbound call carries X-Request-Id +
+ * traceparent headers, giving us end-to-end correlation across Web → Python → Java.
  */
 
 import { pythonApi } from "@/config/api";
+import { http } from "@/lib/http";
 
 // ─────────────────────────────────────────────────────────────────────────
 // Shipping Advisor Types
@@ -106,61 +110,34 @@ export interface RecommendationResponse {
 // ─────────────────────────────────────────────────────────────────────────
 
 class AdvisorService {
-  /**
-   * Get shipping advice by combining RAG context, tools, and LLM reasoning.
-   */
   async getShippingAdvice(
     request: ShippingAdvisorRequest,
   ): Promise<ShippingAdvisorResponse> {
-    const response = await fetch(pythonApi.advisors.shipping(), {
+    return http<ShippingAdvisorResponse>(pythonApi.advisors.shipping(), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
+      skipAuth: true,
     });
-
-    if (!response.ok) {
-      throw new Error(`Shipping advisor failed: ${response.statusText}`);
-    }
-
-    return response.json();
   }
 
-  /**
-   * Get tracking/delivery guidance.
-   */
   async getTrackingGuidance(
     request: TrackingAdvisorRequest,
   ): Promise<TrackingAdvisorResponse> {
-    const response = await fetch(pythonApi.advisors.tracking(), {
+    return http<TrackingAdvisorResponse>(pythonApi.advisors.tracking(), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
+      skipAuth: true,
     });
-
-    if (!response.ok) {
-      throw new Error(`Tracking advisor failed: ${response.statusText}`);
-    }
-
-    return response.json();
   }
 
-  /**
-   * Get service recommendations with scoring and explanations.
-   */
   async getRecommendations(
     request: RecommendationRequest,
   ): Promise<RecommendationResponse> {
-    const response = await fetch(pythonApi.advisors.recommendation(), {
+    return http<RecommendationResponse>(pythonApi.advisors.recommendation(), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
+      skipAuth: true,
     });
-
-    if (!response.ok) {
-      throw new Error(`Recommendation failed: ${response.statusText}`);
-    }
-
-    return response.json();
   }
 }
 
