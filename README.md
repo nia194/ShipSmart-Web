@@ -38,6 +38,7 @@ src/
 │       ├── client.ts
 │       └── types.ts
 ├── lib/
+│   ├── http.ts                    Shared fetch wrapper: mints X-Request-Id + W3C traceparent, attaches Supabase JWT, optional Idempotency-Key, parses RFC 7807 ProblemDetail
 │   ├── advisor-api.ts             Python fetch helpers (advisors, RAG, recommendations)
 │   ├── ai-types.ts                Advisor/RAG response shapes
 │   ├── shipping-data.ts           Static carrier/service reference data
