@@ -1,10 +1,78 @@
 # ShipSmart — Web Frontend (`web`)
 
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Deploy: Render](https://img.shields.io/badge/Deploy-Render-46E3B7?logo=render&logoColor=white)](https://render.com/)
+[![License](https://img.shields.io/badge/License-See%20LICENSE-blue)](./LICENSE)
+
 React SPA for the ShipSmart shipping comparison and management platform.
-Talks to two backends directly: the Java transactional API and the
-Python AI/orchestration API.
+Talks to two backends directly: the Java transactional API
+([ShipSmart-Orchestrator](https://github.com/nia194/ShipSmart-Orchestrator))
+and the Python AI/orchestration API
+([ShipSmart-API](https://github.com/nia194/ShipSmart-API)).
 
 **Stack:** React 19 · TypeScript 5.9 · Vite 5 · Tailwind + shadcn/ui · Radix UI · TanStack Query · React Router · Supabase JS · Zod + react-hook-form
+
+---
+
+## Table of contents
+
+- [The ShipSmart ecosystem](#the-shipsmart-ecosystem)
+- [What this app does](#what-this-app-does)
+- [Architecture inside this app](#architecture-inside-this-app)
+- [Running locally](#running-locally)
+- [Available scripts](#available-scripts)
+- [Deployment (Render)](#deployment-render)
+- [Cross-service contracts](#cross-service-contracts)
+- [Operational notes](#operational-notes)
+- [License](#license)
+
+---
+
+## The ShipSmart ecosystem
+
+This frontend is one of five sibling repositories. Clone them as
+siblings of this directory when working on the full system.
+
+| Repo | Role | Stack |
+|---|---|---|
+| **[ShipSmart-Web](https://github.com/nia194/ShipSmart-Web)** *(this repo)* | React SPA — user-facing UI | React 19, Vite, TS |
+| [ShipSmart-Orchestrator](https://github.com/nia194/ShipSmart-Orchestrator) | Java transactional API — **single writer** to Supabase Postgres; quotes, bookings, saved options, carrier integration | Spring Boot 3.4, Java 17 |
+| [ShipSmart-API](https://github.com/nia194/ShipSmart-API) | Python AI/orchestration service — RAG, advisors, recommendations | FastAPI, Python 3.13 |
+| [ShipSmart-MCP](https://github.com/nia194/ShipSmart-MCP) | MCP tool server — `validate_address`, `get_quote_preview` (provider-pluggable) | FastAPI + MCP |
+| [ShipSmart-Infra](https://github.com/nia194/ShipSmart-Infra) | Supabase migrations + edge functions, deployment configs, docs | Supabase, Render blueprints |
+
+```
+                ┌───────────────────────────────────────────────────┐
+                │              ShipSmart-Web (this repo)            │
+                │                React SPA · Vite                   │
+                └───────────────┬───────────────────────┬───────────┘
+                                │                       │
+                  Authorization: Bearer <Supabase JWT>  │
+                                │                       │
+                                ▼                       ▼
+        ┌──────────────────────────────┐   ┌──────────────────────────────┐
+        │     ShipSmart-Orchestrator   │   │         ShipSmart-API        │
+        │        Java / Spring Boot    │◀──│         Python / FastAPI     │
+        │  (sole writer to Postgres)   │   │      RAG · advisors · recs   │
+        └──────────────┬───────────────┘   └──────────────┬───────────────┘
+                       │                                  │
+                       │                                  ▼
+                       │                   ┌──────────────────────────────┐
+                       │                   │        ShipSmart-MCP         │
+                       │                   │   shipping tools (HTTP/MCP)  │
+                       │                   └──────────────────────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │   Supabase Postgres + Auth   │
+        └──────────────────────────────┘
+```
+
+The Web app holds a Supabase session and sends the same JWT to both
+backends. The Python service forwards that JWT to Java when it needs to
+hydrate quotes for the recommendation endpoint.
 
 ---
 
@@ -68,7 +136,7 @@ the legacy Supabase edge function path.
 ### Prerequisites
 
 - Node.js 20+
-- pnpm 9+
+- pnpm 9+ (`corepack enable` will pick it up automatically)
 
 ### Install
 
@@ -115,14 +183,46 @@ their deployed equivalents.
 
 ---
 
-## Build & test
+## Available scripts
+
+| Script | What it does |
+|---|---|
+| `pnpm dev` | Vite dev server on port 5173 with HMR. |
+| `pnpm build` | Production build into `dist/`. |
+| `pnpm build:dev` | Build in development mode (sourcemaps, no minification). |
+| `pnpm preview` | Serve the built `dist/` locally to smoke-test the production bundle. |
+| `pnpm typecheck` | `tsc -b --noEmit` — catch type errors without emitting JS. |
+| `pnpm lint` | ESLint across the repo. |
+| `pnpm test` | Vitest one-shot run. |
+| `pnpm test:watch` | Vitest in watch mode. |
+
+---
+
+## Deployment (Render)
+
+This repo is deployed as a **Render Static Site** using the
+[`render.yaml`](./render.yaml) Blueprint at the root. The build runs:
 
 ```bash
-pnpm build        # production build → dist/
-pnpm test         # vitest run
-pnpm typecheck
-pnpm lint
+corepack enable && pnpm install && pnpm build
 ```
+
+…and Render publishes `dist/`. A rewrite rule (`/*` → `/index.html`)
+keeps client-side routing working on hard refresh.
+
+Two env vars are marked `sync: false` and must be set manually in the
+Render dashboard before the first deploy:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+The Java and Python API base URLs default to the production Render
+services (`shipsmart-api-java.onrender.com` and
+`shipsmart-api-python.onrender.com`). Override them in the dashboard if
+you point this frontend at a different environment.
+
+PR previews are disabled — toggle `pullRequestPreviewsEnabled` in
+`render.yaml` if you want them back.
 
 ---
 
@@ -161,3 +261,16 @@ quote state on the client.
 - **Echo / placeholder advisor responses**: the Python service has no
   LLM provider configured. Set `OPENAI_API_KEY` (or `ANTHROPIC_API_KEY`)
   + the matching `LLM_PROVIDER_*` flag in `ShipSmart-API/.env`.
+- **404 on hard refresh in production**: confirm the Render rewrite
+  rule from `render.yaml` is in place — without it, deep links bypass
+  the SPA shell.
+- **Auth works locally, fails on Render**: re-check that
+  `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set in the Render
+  dashboard (they are `sync: false` and won't be picked up from the
+  blueprint).
+
+---
+
+## License
+
+See [LICENSE](./LICENSE) for the full text.
