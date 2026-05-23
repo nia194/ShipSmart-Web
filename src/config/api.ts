@@ -18,8 +18,6 @@ export const apiConfig = {
   /** Supabase anon key (public) */
   supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
 
-  appEnv: import.meta.env.VITE_APP_ENV ?? "development",
-
   /**
    * Feature flag: use the new Java API for quote generation instead of
    * the legacy Supabase edge function. Set VITE_USE_JAVA_QUOTES=true to enable.
@@ -44,26 +42,7 @@ export const apiConfig = {
 
 /** Pre-built API path helpers */
 export const javaApi = {
-  health: () => `${apiConfig.javaApiBaseUrl}/api/v1/health`,
-  shipments: () => `${apiConfig.javaApiBaseUrl}/api/v1/shipments`,
   quotes: () => `${apiConfig.javaApiBaseUrl}/api/v1/quotes`,
   savedOptions: () => `${apiConfig.javaApiBaseUrl}/api/v1/saved-options`,
   bookingRedirect: () => `${apiConfig.javaApiBaseUrl}/api/v1/bookings/redirect`,
-} as const;
-
-export const pythonApi = {
-  health: () => `${apiConfig.pythonApiBaseUrl}/health`,
-  advisors: {
-    shipping: () => `${apiConfig.pythonApiBaseUrl}/api/v1/advisor/shipping`,
-    tracking: () => `${apiConfig.pythonApiBaseUrl}/api/v1/advisor/tracking`,
-    recommendation: () => `${apiConfig.pythonApiBaseUrl}/api/v1/advisor/recommendation`,
-  },
-  rag: {
-    query: () => `${apiConfig.pythonApiBaseUrl}/api/v1/rag/query`,
-    ingest: () => `${apiConfig.pythonApiBaseUrl}/api/v1/rag/ingest`,
-  },
-  orchestration: {
-    run: () => `${apiConfig.pythonApiBaseUrl}/api/v1/orchestration/run`,
-    tools: () => `${apiConfig.pythonApiBaseUrl}/api/v1/orchestration/tools`,
-  },
 } as const;
