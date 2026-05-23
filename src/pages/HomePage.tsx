@@ -104,7 +104,6 @@ export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
 
   // Results
   const [resultsLoaded, setResultsLoaded] = useState(false);
-  const [needsRefresh, setNeedsRefresh] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [signInModalOpen, setSignInModalOpen] = useState(false);
   const [pendingSaveService, setPendingSaveService] = useState<ShippingService | null>(null);
@@ -137,19 +136,17 @@ export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
     setCompletedSections(prev => new Set([...prev, 'location']));
     setRevealedSections(prev => new Set([...prev, 'dates']));
     setEstimateStage('location');
-    if (resultsLoaded) setNeedsRefresh(true);
     // Chain: if dates are already valid, skip straight through
     setActiveSection('dates');
-  }, [resultsLoaded]);
+  }, []);
 
   const completeDates = useCallback((currentDropDate: Date | undefined, currentDelivDate: Date | undefined) => {
     if (!currentDropDate || !currentDelivDate) return;
     setCompletedSections(prev => new Set([...prev, 'dates']));
     setRevealedSections(prev => new Set([...prev, 'details']));
     setEstimateStage('dates');
-    if (resultsLoaded) setNeedsRefresh(true);
     setActiveSection('details');
-  }, [resultsLoaded]);
+  }, []);
 
   // Guard: clear deliver-by if it's before drop-off
   useEffect(() => {
@@ -170,8 +167,7 @@ export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
     setDestCommitted(false);
     setCompletedSections(new Set()); // un-complete all; revealedSections untouched
     setEstimateStage(null);
-    if (resultsLoaded) setNeedsRefresh(true);
-  }, [resultsLoaded]);
+  }, []);
 
   const handleEditDates = useCallback(() => {
     setActiveSection('dates');
@@ -186,8 +182,7 @@ export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
       return updated;
     });
     setEstimateStage('location');
-    if (resultsLoaded) setNeedsRefresh(true);
-  }, [resultsLoaded, originCommitted, destCommitted, origin, dest]);
+  }, [originCommitted, destCommitted, origin, dest]);
 
   const handleEditDetails = useCallback(() => {
     setActiveSection('details');
@@ -204,8 +199,7 @@ export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
       return updated;
     });
     setEstimateStage('dates');
-    if (resultsLoaded) setNeedsRefresh(true);
-  }, [resultsLoaded, originCommitted, destCommitted, origin, dest, dropDate, delivDate]);
+  }, [originCommitted, destCommitted, origin, dest, dropDate, delivDate]);
 
   // ── CLICK COLLAPSED/WAITING SECTION → reopen it ──
   const handleSectionClick = useCallback((section: SectionId) => {
@@ -223,7 +217,6 @@ export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
     }
     setEstimateStage('details');
     setResultsLoaded(true);
-    setNeedsRefresh(false);
     setOpenId(null);
     setTimeout(() => res.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
     fetchQuotes(origin, dest, dropDateStr, delivDateStr, packages);
