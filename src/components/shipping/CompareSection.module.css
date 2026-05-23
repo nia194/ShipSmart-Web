@@ -145,15 +145,6 @@
   border-bottom: 1px solid #E5E7EB;
 }
 
-.insightCell:first-of-type,
-.optionHeader + .insightCell {
-  /* no specific rule — grid handles ordering */
-}
-
-.grid > .insightCell:nth-child(var(--col-count-plus-two, 5)) {
-  /* placeholder; actual borders handled by sibling positioning below */
-}
-
 .insightRole {
   font-size: 10.5px;
   font-weight: 700;
