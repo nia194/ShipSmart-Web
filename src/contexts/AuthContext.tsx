@@ -27,8 +27,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         setTimeout(() => {
           supabase.from("profiles").select("display_name").eq("user_id", session.user.id).single()
-            .then(({ data }) => setDisplayName(data?.display_name ?? null))
-            .catch(() => setDisplayName(null));
+            .then(
+              ({ data }) => setDisplayName(data?.display_name ?? null),
+              () => setDisplayName(null),
+            );
         }, 0);
       } else {
         setDisplayName(null);
@@ -41,8 +43,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         supabase.from("profiles").select("display_name").eq("user_id", session.user.id).single()
-          .then(({ data }) => setDisplayName(data?.display_name ?? null))
-          .catch(() => setDisplayName(null));
+          .then(
+            ({ data }) => setDisplayName(data?.display_name ?? null),
+            () => setDisplayName(null),
+          );
       }
       setLoading(false);
     });
@@ -74,6 +78,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// Colocated with AuthProvider by design; the hook and its provider belong
+// together. This only costs a fast-refresh full reload for this file in dev.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) throw new Error("useAuth must be used within AuthProvider");
