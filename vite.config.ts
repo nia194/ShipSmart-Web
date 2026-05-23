@@ -29,6 +29,17 @@ export default defineConfig(({ mode }) => ({
     build: {
       outDir: "dist",
       sourcemap: mode !== "production",
+      rollupOptions: {
+        output: {
+          // Split large, rarely-changing vendor libs into their own cacheable
+          // chunks so the main bundle stays well under the size-warning limit.
+          manualChunks: {
+            "react-vendor": ["react", "react-dom", "react-router-dom"],
+            supabase: ["@supabase/supabase-js"],
+            query: ["@tanstack/react-query"],
+          },
+        },
+      },
     },
     define: {
       __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
