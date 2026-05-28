@@ -8,10 +8,9 @@ interface CityInputProps {
   placeholder: string;
   icon: string;
   inputRef?: RefObject<HTMLInputElement | null>;
-  onBlurExtra?: () => void;
 }
 
-export const CityInput = ({ value, onChange, onSelect, placeholder, icon, inputRef, onBlurExtra }: CityInputProps) => {
+export const CityInput = ({ value, onChange, onSelect, placeholder, icon, inputRef }: CityInputProps) => {
   const [sug, setSug] = useState<string[]>([]);
   const [focused, setFocused] = useState(false);
   const wr = useRef<HTMLDivElement>(null);
@@ -33,10 +32,9 @@ export const CityInput = ({ value, onChange, onSelect, placeholder, icon, inputR
         value={value}
         onChange={e => onChange(e.target.value)}
         onFocus={() => setFocused(true)}
-        onBlur={() => { setTimeout(() => { setFocused(false); onBlurExtra?.(); }, 180); }}
+        onBlur={() => { setTimeout(() => setFocused(false), 180); }}
         onKeyDown={e => {
           if (e.key === "Enter" && sug.length) { onSelect(sug[0]); setFocused(false); }
-          else if (e.key === "Enter") onBlurExtra?.();
         }}
       />
       {sug.length > 0 && focused && (
