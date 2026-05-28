@@ -5,16 +5,6 @@ export const StepNum = ({ n, done }: StepNumProps) => (
   </div>
 );
 
-interface PriceBadgeProps { amount: string; label: string }
-export const PriceBadge = ({ amount, label }: PriceBadgeProps) => (
-  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "8px 0", animation: "fadeIn .4s both" }}>
-    <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 10, background: "linear-gradient(135deg,#f0fdf4,#dcfce7)", border: "1.5px solid #bbf7d0" }}>
-      <span style={{ fontSize: 13, fontWeight: 800, color: "#15803d" }}>Starting at ${amount}</span>
-      <span style={{ fontSize: 10, color: "#6b7280" }}>{label}</span>
-    </div>
-  </div>
-);
-
 interface PriceBreakdownProps {
   breakdown: { shipping: { label: string; amount: number }[]; pickup: { label: string; amount: number }[] } | null;
   total: number;
