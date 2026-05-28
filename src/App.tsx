@@ -2,8 +2,6 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes, useNavigate, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useSavedOptions } from "@/hooks/useSavedOptions";
 import NotFound from "@/pages/NotFound";
@@ -76,7 +74,6 @@ function AppNav() {
         <Routes>
           <Route path="/" element={<HomePage savedIds={savedIds} onSaveService={toggleSave} />} />
           <Route path="/saved" element={<SavedPage savedServices={savedOptions} onRemove={removeSaved} onNavigateHome={() => navigate("/")} />} />
-          <Route path="/auth" element={<AuthPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
@@ -86,15 +83,12 @@ function AppNav() {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <AppNav />
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
+    <Toaster />
+    <BrowserRouter>
+      <AuthProvider>
+        <AppNav />
+      </AuthProvider>
+    </BrowserRouter>
   </QueryClientProvider>
 );
 
