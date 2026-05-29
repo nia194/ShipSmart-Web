@@ -13,7 +13,7 @@ Talks to two backends directly: the Java transactional API
 and the Python AI/orchestration API
 ([ShipSmart-API](https://github.com/nia194/ShipSmart-API)).
 
-**Stack:** React 19 · TypeScript 5.9 · Vite 5 · Tailwind + shadcn/ui · Radix UI · TanStack Query · React Router · Supabase JS · Zod + react-hook-form
+**Stack:** React 19 · TypeScript 5.9 · Vite 5 · Tailwind + shadcn/ui · Radix UI · TanStack Query · React Router · Supabase JS
 
 ---
 
@@ -70,9 +70,9 @@ siblings of this directory when working on the full system.
         └──────────────────────────────┘
 ```
 
-The Web app holds a Supabase session and sends the same JWT to both
-backends. The Python service forwards that JWT to Java when it needs to
-hydrate quotes for the recommendation endpoint.
+The Web app holds a Supabase session and attaches the JWT to its Java
+API calls. The Python comparison endpoint (`/api/v1/compare`) is called
+without auth — it returns ranking/insight data only.
 
 ---
 
@@ -80,14 +80,11 @@ hydrate quotes for the recommendation endpoint.
 
 | Page / feature | Calls | Notes |
 |---|---|---|
-| Auth (login, signup) | Supabase JS | JWT stored in Supabase client; forwarded to both APIs as `Authorization: Bearer …`. |
-| Quote comparison | Java `/api/v1/quotes` | Submit a shipment, get service quotes. |
-| Saved options | Java `/api/v1/saved-options` | Authenticated CRUD. |
-| Booking redirect | Java `/api/v1/bookings/redirect` | Hands off to carrier with tracking enabled. |
-| Shipping advisor | Python `/api/v1/advisor/shipping` | RAG + tool-grounded LLM advice. |
-| Tracking advisor | Python `/api/v1/advisor/tracking` | RAG + LLM guidance, returns next steps. |
-| Recommendations | Python `/api/v1/advisor/recommendation` | Scored ranking of services. Can pass `services[]` directly **or** just `context.shipment_request_id` to have Python hydrate from Java. |
-| RAG q&a | Python `/api/v1/rag/query` | General shipping questions over the document knowledge base. |
+| Auth (login, signup) | Supabase JS | JWT stored in Supabase client; attached to Java API calls as `Authorization: Bearer …`. |
+| Quote comparison | Java `/api/v1/quotes` | Submit a shipment, get service quotes. Falls back to the `get-shipping-quotes` Supabase edge function when `VITE_USE_JAVA_QUOTES=false`. |
+| Comparison insights | Python `/api/v1/compare` | Scored ranking, per-option insights, and scenario breakdowns for the compared services. |
+| Saved options | Java `/api/v1/saved-options` | Authenticated CRUD. Falls back to a Supabase edge function when `VITE_USE_JAVA_SAVED_OPTIONS=false`. |
+| Booking redirect | Java `/api/v1/bookings/redirect` | Hands off to carrier with tracking enabled (`VITE_USE_JAVA_BOOKING_REDIRECT`). |
 
 ---
 
@@ -96,9 +93,16 @@ hydrate quotes for the recommendation endpoint.
 ```
 src/
 ├── main.tsx                       React entry
-├── App.tsx                        Router shell
-├── pages/                         Route components (Home, Auth, Advisor, Saved, NotFound)
-├── components/                    Shared UI (shadcn/ui based)
+├── App.tsx                        Router shell + top nav
+├── pages/                         Route components (HomePage, AuthPage, SavedPage, NotFound)
+├── components/
+│   ├── auth/                      SaveSignInModal (sign-in prompt before saving)
+│   ├── shipping/                  Core comparison UI + its API/types
+│   │   ├── CompareSection.tsx     Results list + comparison view
+│   │   ├── compare.api.ts         Python /api/v1/compare fetch helper
+│   │   ├── compare.types.ts       Compare request/response + domain types (Shipment, CompareOption, …)
+│   │   ├── CityInput.tsx, QuoteRow.tsx, Logo.tsx, BookmarkIcon.tsx, SharedUI.tsx
+│   └── ui/                        shadcn/ui primitives in use (dialog, popover, toast, calendar, …)
 ├── contexts/
 │   └── AuthContext.tsx            Supabase session + auth helpers
 ├── integrations/
@@ -107,23 +111,22 @@ src/
 │       └── types.ts
 ├── lib/
 │   ├── http.ts                    Shared fetch wrapper: mints X-Request-Id + W3C traceparent, attaches Supabase JWT, optional Idempotency-Key, parses RFC 7807 ProblemDetail
-│   ├── advisor-api.ts             Python fetch helpers (advisors, RAG, recommendations)
-│   ├── ai-types.ts                Advisor/RAG response shapes
-│   ├── shipping-data.ts           Static carrier/service reference data
+│   ├── shipping-data.ts           Static carrier/service reference data + helpers
 │   └── utils.ts
 ├── config/
-│   └── api.ts                     Base URLs + feature flags + endpoint helpers (javaApi/pythonApi)
-├── hooks/                         TanStack Query wrappers
+│   └── api.ts                     Base URLs + feature flags + Java endpoint helpers (javaApi)
+├── hooks/                         TanStack Query / data hooks
 │   ├── useShippingQuotes.ts       Java /quotes (or Supabase edge fn fallback)
 │   ├── useSavedOptions.ts         Java /saved-options (or Supabase edge fn fallback)
-│   └── useRecommendation.ts       Python /advisor/recommendation
-└── shared/types/                  Canonical domain types (Shipment, Quote, SavedOption, etc.)
+│   ├── use-toast.ts               Radix toast state
+│   └── use-mobile.tsx             Viewport breakpoint hook
+└── styles/                        Global stylesheet (shipsmart.css)
 ```
 
-API hooks attach the Supabase access token automatically when the user
-is signed in. The same token is accepted by both backends (Supabase
-HS256 JWT validated by Java's `JwtAuthFilter`, and forwarded by Python
-to Java when the recommendation hydration path runs).
+Java API calls attach the Supabase access token automatically when the
+user is signed in (Supabase HS256 JWT validated by Java's
+`JwtAuthFilter`). The Python `/api/v1/compare` endpoint is called
+unauthenticated.
 
 Each Java-backed feature has a `VITE_USE_JAVA_*` flag (see env vars
 below). When the flag is `false`, the corresponding hook falls back to
@@ -231,20 +234,14 @@ PR previews are disabled — toggle `pullRequestPreviewsEnabled` in
 When the Java or Python APIs change shape, update these files in
 lockstep:
 
-- `src/config/api.ts` (`javaApi` / `pythonApi` helpers) ↔ Java/Python
+- `src/config/api.ts` (`javaApi` helpers + base URLs) ↔ Java/Python
   route paths
-- `src/hooks/useShippingQuotes.ts`, `useSavedOptions.ts`,
-  `useRecommendation.ts` ↔ Java controller DTOs and Python advisor
-  schemas they call
-- `src/lib/advisor-api.ts` ↔ Python `app/schemas/advisor.py` and
-  `app/api/routes/orchestration.py`
-- `src/shared/types/` for canonical domain types (Shipment, Quote, SavedOption, etc.)
-
-For the recommendation endpoint in particular: you can either send a
-full `services[]` array or just `context.shipment_request_id` and let
-the Python service fetch the quotes from Java internally. The frontend
-should prefer the latter once a shipment exists, to avoid duplicating
-quote state on the client.
+- `src/hooks/useShippingQuotes.ts`, `useSavedOptions.ts` ↔ Java
+  controller DTOs (and the Supabase edge function fallbacks) they call
+- `src/components/shipping/compare.api.ts` and `compare.types.ts` ↔
+  the Python `/api/v1/compare` request/response schema
+- `compare.types.ts` also holds the canonical domain types (Shipment,
+  CompareOption, OptionInsight, Scenario, etc.)
 
 ---
 
@@ -255,12 +252,10 @@ quote state on the client.
 - **CORS errors hitting Java/Python**: each backend's
   `CORS_ALLOWED_ORIGINS` must include `http://localhost:5173` (or your
   deployed origin).
-- **HTTP 429 from `/advisor/*`**: the Python service rate-limits
-  advisor endpoints per IP (default `10/minute`). Tune via
-  `RATE_LIMIT_ADVISOR` on the Python side.
-- **Echo / placeholder advisor responses**: the Python service has no
-  LLM provider configured. Set `OPENAI_API_KEY` (or `ANTHROPIC_API_KEY`)
-  + the matching `LLM_PROVIDER_*` flag in `ShipSmart-API/.env`.
+- **Comparison insights missing / `/api/v1/compare` errors**: confirm
+  the Python service is running and `VITE_PYTHON_API_BASE_URL` points at
+  it. Quotes still render from Java even if `/compare` fails — only the
+  ranking/insight overlay is affected.
 - **404 on hard refresh in production**: confirm the Render rewrite
   rule from `render.yaml` is in place — without it, deep links bypass
   the SPA shell.
