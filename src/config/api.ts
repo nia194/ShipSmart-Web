@@ -45,4 +45,12 @@ export const javaApi = {
   quotes: () => `${apiConfig.javaApiBaseUrl}/api/v1/quotes`,
   savedOptions: () => `${apiConfig.javaApiBaseUrl}/api/v1/saved-options`,
   bookingRedirect: () => `${apiConfig.javaApiBaseUrl}/api/v1/bookings/redirect`,
+  /** Read-only shipment fetch (JWT-scoped) — used to hydrate advisor context. */
+  shipment: (id: string) => `${apiConfig.javaApiBaseUrl}/api/v1/shipments/${id}`,
+} as const;
+
+/** FastAPI Python (AI/advisor) path helpers */
+export const pythonApi = {
+  advisorShipping: () => `${apiConfig.pythonApiBaseUrl}/api/v1/advisor/shipping`,
+  advisorTracking: () => `${apiConfig.pythonApiBaseUrl}/api/v1/advisor/tracking`,
 } as const;
