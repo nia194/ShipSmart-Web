@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { SaveSignInModal } from "@/components/auth/SaveSignInModal";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import AdvisorPanel from "@/components/advisor/AdvisorPanel";
 
 interface HomePageProps {
   savedIds: Set<string>;
@@ -603,6 +604,18 @@ export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
                   }
                   return null;
                 })()}
+
+                {/* Shipment-scoped advisor — isolated; its errors never affect
+                    the quote/save/booking flow above. */}
+                <AdvisorPanel
+                  context={{
+                    origin_zip: origin || undefined,
+                    destination_zip: dest || undefined,
+                    weight_lbs: tw || undefined,
+                    drop_off_date: dropDateStr || undefined,
+                    expected_delivery_date: delivDateStr || undefined,
+                  }}
+                />
               </div>
             )}
           </div>
