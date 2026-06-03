@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -43,5 +44,11 @@ export default defineConfig(({ mode }) => ({
     },
     define: {
       __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
+    },
+    test: {
+      globals: true,
+      environment: "jsdom",
+      setupFiles: ["./src/test/setup.ts"],
+      css: false,
     },
   }));
