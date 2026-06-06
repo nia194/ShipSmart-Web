@@ -83,6 +83,7 @@ without auth — it returns ranking/insight data only.
 | Auth (login, signup) | Supabase JS | JWT stored in Supabase client; attached to Java API calls as `Authorization: Bearer …`. |
 | Quote comparison | Java `/api/v1/quotes` | Submit a shipment, get service quotes. Falls back to the `get-shipping-quotes` Supabase edge function when `VITE_USE_JAVA_QUOTES=false`. |
 | Comparison insights | Python `/api/v1/compare` | Scored ranking, per-option insights, and scenario breakdowns for the compared services. |
+| Shipment advisor | Python `/api/v1/advisor/{shipping,tracking}` | Shipment-scoped Q&A panel (`src/components/advisor/`) with provenance badges + source citations. Read-only hydrates context from Java `GET /api/v1/shipments/{id}`. Degrades gracefully — advisor errors never affect quotes/bookings. |
 | Saved options | Java `/api/v1/saved-options` | Authenticated CRUD. Falls back to a Supabase edge function when `VITE_USE_JAVA_SAVED_OPTIONS=false`. |
 | Booking redirect | Java `/api/v1/bookings/redirect` | Hands off to carrier with tracking enabled (`VITE_USE_JAVA_BOOKING_REDIRECT`). |
 
@@ -196,8 +197,22 @@ their deployed equivalents.
 | `pnpm preview` | Serve the built `dist/` locally to smoke-test the production bundle. |
 | `pnpm typecheck` | `tsc -b --noEmit` — catch type errors without emitting JS. |
 | `pnpm lint` | ESLint across the repo. |
-| `pnpm test` | Vitest one-shot run. |
+| `pnpm test` | Vitest one-shot run (30 tests, jsdom). |
 | `pnpm test:watch` | Vitest in watch mode. |
+
+### Tests
+
+Vitest + `@testing-library/react` (jsdom), under `src/`:
+
+| File | Focus |
+| --- | --- |
+| `lib/advisor-api.test.ts` | The advisor error taxonomy → friendly copy, `shipmentToContext` mapping, input cap. |
+| `lib/http.test.ts` | The shared fetch wrapper: correlation headers, bearer JWT, idempotency key, RFC-7807 `HttpError`, 204. |
+| `hooks/useShippingQuotes.test.ts` / `hooks/useSavedOptions.test.ts` | The Java-vs-Supabase backend toggle and signed-in/out state. |
+| `components/advisor/AdvisorPanel.test.tsx` | Provenance badges, citations, graceful error states, client validation. |
+| `components/shipping/CompareSection.test.tsx` | Loading state + comparison grid render from a fixture. |
+
+The TS response interfaces in `src/lib/advisor-api.ts` and `src/components/shipping/compare.types.ts` are also asserted against the backend schemas from `ShipSmart-Test/contract/`.
 
 ---
 
