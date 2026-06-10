@@ -26,6 +26,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The Supabase client (src/integrations/supabase/client.ts) throws if these
+      # are unset. They live in .env.local locally (gitignored), so CI needs dummy
+      # values. Loaded by Vite for both the vitest and build steps.
+      - name: Provide dummy Supabase env for CI (tests + build)
+        run: |
+          echo "VITE_SUPABASE_URL=https://example.supabase.co" >> .env
+          echo "VITE_SUPABASE_ANON_KEY=ci-dummy-anon-key" >> .env
+
       - name: Lint (eslint)
         run: pnpm lint
 
