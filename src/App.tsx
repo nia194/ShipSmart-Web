@@ -5,11 +5,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useSavedOptions } from "@/hooks/useSavedOptions";
 import NotFound from "@/pages/NotFound";
+import { apiConfig } from "@/config/api";
 import "@/styles/shipsmart.css";
 
 const HomePage = lazy(() => import("@/pages/HomePage"));
 const SavedPage = lazy(() => import("@/pages/SavedPage"));
 const AuthPage = lazy(() => import("@/pages/AuthPage"));
+const WorkflowPage = lazy(() => import("@/pages/WorkflowPage"));
 
 const PageLoader = () => (
   <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
@@ -52,6 +54,9 @@ function AppNav() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <button className={`ss-nav-link ${location.pathname === "/" ? "active" : ""}`} onClick={() => navigate("/")}>Search</button>
+          {apiConfig.useWorkflow && (
+            <button className={`ss-nav-link ${location.pathname === "/workflow" ? "active" : ""}`} onClick={() => navigate("/workflow")}>Workflow</button>
+          )}
           {user && (
             <button className={`ss-nav-link ${location.pathname === "/saved" ? "active" : ""}`} onClick={() => navigate("/saved")}>
               Saved {savedOptions.length > 0 && <span style={{ marginLeft: 4, padding: "1px 6px", borderRadius: 10, background: "#111827", color: "#fff", fontSize: 10, fontWeight: 700 }}>{savedOptions.length}</span>}
@@ -74,6 +79,7 @@ function AppNav() {
         <Routes>
           <Route path="/" element={<HomePage savedIds={savedIds} onSaveService={toggleSave} />} />
           <Route path="/saved" element={<SavedPage savedServices={savedOptions} onRemove={removeSaved} onNavigateHome={() => navigate("/")} />} />
+          {apiConfig.useWorkflow && <Route path="/workflow" element={<WorkflowPage />} />}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
