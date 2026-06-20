@@ -38,6 +38,13 @@ export const apiConfig = {
    * Defaults to false (legacy Supabase edge function).
    */
   useJavaBookingRedirect: import.meta.env.VITE_USE_JAVA_BOOKING_REDIRECT === "true",
+
+  /**
+   * Feature flag: show the multi-agent workflow page (UC3/UC4) backed by the
+   * Python API's /workflow endpoints. Set VITE_USE_WORKFLOW=true to enable.
+   * Defaults to false (the route + nav entry stay hidden).
+   */
+  useWorkflow: import.meta.env.VITE_USE_WORKFLOW === "true",
 } as const;
 
 /** Pre-built API path helpers */
@@ -53,4 +60,8 @@ export const javaApi = {
 export const pythonApi = {
   advisorShipping: () => `${apiConfig.pythonApiBaseUrl}/api/v1/advisor/shipping`,
   advisorTracking: () => `${apiConfig.pythonApiBaseUrl}/api/v1/advisor/tracking`,
+  /** Multi-agent workflow (UC3/UC4). */
+  workflowProcess: () => `${apiConfig.pythonApiBaseUrl}/api/v1/workflow/process`,
+  workflow: (id: string) => `${apiConfig.pythonApiBaseUrl}/api/v1/workflow/${id}`,
+  workflowReview: (id: string) => `${apiConfig.pythonApiBaseUrl}/api/v1/workflow/${id}/review`,
 } as const;
