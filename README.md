@@ -40,7 +40,7 @@ siblings of this directory when working on the full system.
 |---|---|---|
 | **[ShipSmart-Web](https://github.com/nia194/ShipSmart-Web)** *(this repo)* | React SPA — user-facing UI | React 19, Vite, TS |
 | [ShipSmart-Orchestrator](https://github.com/nia194/ShipSmart-Orchestrator) | Java transactional API — **single writer** to Supabase Postgres; quotes, bookings, saved options, carrier integration | Spring Boot 3.4, Java 17 |
-| [ShipSmart-API](https://github.com/nia194/ShipSmart-API) | Python AI/orchestration service — RAG, advisors, recommendations | FastAPI, Python 3.13 |
+| [ShipSmart-API](https://github.com/nia194/ShipSmart-API) | Python AI/orchestration service — RAG, advisors, recommendations, compliance (UC2), multi-agent workflow (UC3/UC4) | FastAPI, Python 3.13 |
 | [ShipSmart-MCP](https://github.com/nia194/ShipSmart-MCP) | MCP tool server — `validate_address`, `get_quote_preview` (provider-pluggable) | FastAPI + MCP |
 | [ShipSmart-Infra](https://github.com/nia194/ShipSmart-Infra) | Supabase migrations + edge functions, deployment configs, docs | Supabase, Render blueprints |
 
@@ -86,6 +86,7 @@ without auth — it returns ranking/insight data only.
 | Shipment advisor | Python `/api/v1/advisor/{shipping,tracking}` | Shipment-scoped Q&A panel (`src/components/advisor/`) with provenance badges + source citations. Read-only hydrates context from Java `GET /api/v1/shipments/{id}`. Degrades gracefully — advisor errors never affect quotes/bookings. |
 | Saved options | Java `/api/v1/saved-options` | Authenticated CRUD. Falls back to a Supabase edge function when `VITE_USE_JAVA_SAVED_OPTIONS=false`. |
 | Booking redirect | Java `/api/v1/bookings/redirect` | Hands off to carrier with tracking enabled (`VITE_USE_JAVA_BOOKING_REDIRECT`). |
+| Multi-agent workflow (UC3/UC4) | Python `/api/v1/workflow/{process,{id},{id}/review}` | Optional showcase page (`src/components/workflow/`, `src/pages/WorkflowPage.tsx`): run a shipment through the multi-agent workflow, and when it suspends on an unverified high-risk area, clear/block it as a human reviewer. Gated behind `VITE_USE_WORKFLOW` (route + nav hidden when off). |
 
 ---
 
@@ -95,9 +96,10 @@ without auth — it returns ranking/insight data only.
 src/
 ├── main.tsx                       React entry
 ├── App.tsx                        Router shell + top nav
-├── pages/                         Route components (HomePage, AuthPage, SavedPage, NotFound)
+├── pages/                         Route components (HomePage, AuthPage, SavedPage, WorkflowPage, NotFound)
 ├── components/
 │   ├── auth/                      SaveSignInModal (sign-in prompt before saving)
+│   ├── workflow/                  Workflow UI (UC3/UC4): WorkflowForm, WorkflowResult, ReviewPanel — gated on VITE_USE_WORKFLOW
 │   ├── shipping/                  Core comparison UI + its API/types
 │   │   ├── CompareSection.tsx     Results list + comparison view
 │   │   ├── compare.api.ts         Python /api/v1/compare fetch helper
@@ -112,6 +114,8 @@ src/
 │       └── types.ts
 ├── lib/
 │   ├── http.ts                    Shared fetch wrapper: mints X-Request-Id + W3C traceparent, attaches Supabase JWT, optional Idempotency-Key, parses RFC 7807 ProblemDetail
+│   ├── advisor-api.ts             Typed client for the Python advisor endpoints (via http)
+│   ├── workflow-api.ts            Typed client for the Python /workflow endpoints (UC3/UC4, via http)
 │   ├── shipping-data.ts           Static carrier/service reference data + helpers
 │   └── utils.ts
 ├── config/
@@ -167,6 +171,9 @@ VITE_APP_ENV=development
 VITE_USE_JAVA_QUOTES=true
 VITE_USE_JAVA_SAVED_OPTIONS=true
 VITE_USE_JAVA_BOOKING_REDIRECT=true
+
+# Multi-agent workflow page (UC3/UC4) — off by default (route + nav hidden).
+VITE_USE_WORKFLOW=false
 ```
 
 Without `VITE_SUPABASE_ANON_KEY` the Supabase client cannot initialize
@@ -197,7 +204,7 @@ their deployed equivalents.
 | `pnpm preview` | Serve the built `dist/` locally to smoke-test the production bundle. |
 | `pnpm typecheck` | `tsc -b --noEmit` — catch type errors without emitting JS. |
 | `pnpm lint` | ESLint across the repo. |
-| `pnpm test` | Vitest one-shot run (30 tests, jsdom). |
+| `pnpm test` | Vitest one-shot run (41 tests, jsdom). |
 | `pnpm test:watch` | Vitest in watch mode. |
 
 ### Tests
@@ -211,8 +218,10 @@ Vitest + `@testing-library/react` (jsdom), under `src/`:
 | `hooks/useShippingQuotes.test.ts` / `hooks/useSavedOptions.test.ts` | The Java-vs-Supabase backend toggle and signed-in/out state. |
 | `components/advisor/AdvisorPanel.test.tsx` | Provenance badges, citations, graceful error states, client validation. |
 | `components/shipping/CompareSection.test.tsx` | Loading state + comparison grid render from a fixture. |
+| `lib/workflow-api.test.ts` | Workflow error taxonomy → friendly copy, advisory `verdictLabel` mapping, input cap. |
+| `components/workflow/WorkflowPage.test.tsx` | Submit → suspended (`awaiting_review`) result + review panel → clear → completed. |
 
-The TS response interfaces in `src/lib/advisor-api.ts` and `src/components/shipping/compare.types.ts` are also asserted against the backend schemas from `ShipSmart-Test/contract/`.
+The TS response interfaces in `src/lib/advisor-api.ts`, `src/lib/workflow-api.ts`, and `src/components/shipping/compare.types.ts` are also asserted against the backend schemas from `ShipSmart-Test/contract/`.
 
 ---
 
@@ -257,6 +266,9 @@ lockstep:
   the Python `/api/v1/compare` request/response schema
 - `compare.types.ts` also holds the canonical domain types (Shipment,
   CompareOption, OptionInsight, Scenario, etc.)
+- `src/lib/workflow-api.ts` ↔ the Python `/api/v1/workflow/*` schemas
+  (`WorkflowResponse`, `ComplianceSummary`, HS/duty/carrier/doc domain
+  types) — asserted by `ShipSmart-Test/contract/`
 
 ---
 
