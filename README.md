@@ -27,6 +27,7 @@ and the Python AI/orchestration API
 - [Deployment (Render)](#deployment-render)
 - [Cross-service contracts](#cross-service-contracts)
 - [Operational notes](#operational-notes)
+- [Planned: Hybrid Form ⇄ Chat Sync](#planned-hybrid-form--chat-sync)
 - [License](#license)
 
 ---
@@ -290,6 +291,46 @@ lockstep:
   `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set in the Render
   dashboard (they are `sync: false` and won't be picked up from the
   blueprint).
+
+---
+
+## Planned: Hybrid Form ⇄ Chat Sync
+
+> **Status: planned — not yet implemented.** Documents an upcoming change so the
+> design is on record ahead of the code. None of the modules, the state store, or the
+> behavior below exists yet.
+
+Today the shipment **form** (`HomePage.tsx`) feeds the advisor panel
+(`AdvisorPanel.tsx`) through a **read-only, one-way** `context` prop — nothing the
+user types in chat flows back to the form. The planned change makes the form and a
+conversational **concierge chat** two views over **one shared shipment draft**: type
+"Atlanta → Seattle, 12 lb, by Friday" in chat and the route / weight / date fields
+fill in; fill the form and the chat already knows and won't re-ask. The **bulk of this
+feature lives in this repo.**
+
+Planned shape:
+
+- **One shared `ShipmentDraft` store** (`src/state/shipmentDraft.ts`,
+  `ShipmentDraftContext.tsx`) — a typed superset of every field either surface can
+  gather, backed by a pure `useReducer`. Scalar fields are wrapped in
+  `Tracked<T> { value, source, at }` for provenance (`"form" | "chat" | "hydrated"`).
+  Reuses the existing `PackageItem` / `Priority` types (no parallel models) and React
+  Context + reducer (no new state-management dependency).
+- **Deterministic merge rules** (pure, unit-tested): empty never overwrites non-empty;
+  most-recent explicit user write wins by timestamp; `hydrated` (Java) loses to explicit
+  user writes; normalize before compare; chat fills only *empty* primary-item fields.
+- **Both surfaces bind to the store.** `HomePage`'s shipment `useState`s become
+  reads/writes against the store (section-completion and quote-fetch behavior preserved);
+  the chat panel derives its state from the store and patches it back through two pure
+  adapters — `draftToConciergeState(draft)` and `conciergeStateToPatch(state)`.
+- **The "don't re-ask" UX** — because the chat sends the full draft, the server won't
+  ask for form-filled fields; chat-filled fields appear in the form with a subtle
+  "✦ from chat" hint. A single "Start over" resets both the draft and the chat thread.
+
+**Depends on the (also-planned) Conversational Concierge** chat endpoint
+(`POST /api/v1/concierge/chat`, a slot-filling `ConversationState`) in ShipSmart-API.
+**Backward-compatible and off by default** — with chat unused, the form behaves exactly
+as it does today.
 
 ---
 
