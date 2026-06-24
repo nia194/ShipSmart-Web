@@ -45,6 +45,13 @@ export const apiConfig = {
    * Defaults to false (the route + nav entry stay hidden).
    */
   useWorkflow: import.meta.env.VITE_USE_WORKFLOW === "true",
+
+  /**
+   * Feature flag: show the Conversational Concierge chat, shared with the form
+   * via the ShipmentDraft store. Set VITE_USE_CONCIERGE=true to enable.
+   * Defaults to false (the panel stays hidden; the form behaves exactly as today).
+   */
+  useConcierge: import.meta.env.VITE_USE_CONCIERGE === "true",
 } as const;
 
 /** Pre-built API path helpers */
@@ -64,4 +71,6 @@ export const pythonApi = {
   workflowProcess: () => `${apiConfig.pythonApiBaseUrl}/api/v1/workflow/process`,
   workflow: (id: string) => `${apiConfig.pythonApiBaseUrl}/api/v1/workflow/${id}`,
   workflowReview: (id: string) => `${apiConfig.pythonApiBaseUrl}/api/v1/workflow/${id}/review`,
+  /** Conversational Concierge — stateful slot-filling chat. */
+  conciergeChat: () => `${apiConfig.pythonApiBaseUrl}/api/v1/concierge/chat`,
 } as const;
