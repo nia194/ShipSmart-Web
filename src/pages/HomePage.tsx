@@ -3,7 +3,7 @@
 // per docs/service-boundaries.md when backend is ready.
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { format, isBefore, startOfDay } from "date-fns";
+import { format, isBefore, parseISO, startOfDay } from "date-fns";
 import { CityInput } from "@/components/shipping/CityInput";
 import { StepNum } from "@/components/shipping/SharedUI";
 import { Section } from "@/components/shipping/QuoteRow";
@@ -17,6 +17,9 @@ import { SaveSignInModal } from "@/components/auth/SaveSignInModal";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import AdvisorPanel from "@/components/advisor/AdvisorPanel";
+import ConciergePanel from "@/components/advisor/ConciergePanel";
+import { ShipmentDraftProvider, useShipmentDraft } from "@/state/ShipmentDraftContext";
+import { apiConfig } from "@/config/api";
 
 interface HomePageProps {
   savedIds: Set<string>;
@@ -78,7 +81,7 @@ const EstimateStrip = ({ label }: { label: string }) => (
 type SectionId = 'location' | 'dates' | 'details';
 type EstimateStage = SectionId | null;
 
-export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
+function HomePageInner({ savedIds, onSaveService }: HomePageProps) {
   const { user } = useAuth();
 
   // ── FORM DATA ──
@@ -119,6 +122,42 @@ export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
   const tw = packages.reduce((a, p) => a + (parseFloat(p.weight) || 0) * (parseInt(p.qty) || 1), 0);
   const ti = packages.reduce((a, p) => a + (parseInt(p.qty) || 1), 0);
   const allValid = packages.every(p => p.weight && parseFloat(p.weight) > 0 && p.l && p.w && p.h && p.qty && parseInt(p.qty) >= 1);
+
+  // ── Shared ShipmentDraft store: the form and the chat are two views over it ──
+  const { draft, setField, setItems } = useShipmentDraft();
+
+  // Mirror the form's package list into the store so the chat adapter can read
+  // weight/dims/category off the primary item.
+  useEffect(() => { setItems(packages); }, [packages, setItems]);
+
+  // store → form: apply values the chat (or Java hydration) filled that the form
+  // didn't originate. Form-originated writes are already equal here, so no-ops.
+  useEffect(() => {
+    const v = draft.origin?.value;
+    if (v !== undefined && v !== origin) setOrigin(v);
+  }, [draft.origin]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const v = draft.destination?.value;
+    if (v !== undefined && v !== dest) setDest(v);
+  }, [draft.destination]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const v = draft.priority?.value;
+    if (v && v !== shipmentPriority) setShipmentPriority(v);
+  }, [draft.priority]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const s = draft.dropOffDate?.value;
+    if (s && s !== dropDateStr) setDropDate(parseISO(s));
+  }, [draft.dropOffDate]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const s = draft.deliveryDate?.value;
+    if (s && s !== delivDateStr) setDelivDate(parseISO(s));
+  }, [draft.deliveryDate]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const w = draft.weightLbs?.value;
+    if (w !== undefined && !packages[0]?.weight) {
+      setPackages(prev => prev.map((p, i) => (i === 0 ? { ...p, weight: String(w) } : p)));
+    }
+  }, [draft.weightLbs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ────────────────────────────────────────────────────────────
   // CORE FIX: All progression is event-driven, never useEffect-driven.
@@ -265,6 +304,7 @@ export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
 
   const handleOriginSelect = useCallback((city: string) => {
     setOrigin(city);
+    setField("origin", city, "form");
     setOriginCommitted(true);
     // If dest is already committed, complete location now
     if (destCommitted) {
@@ -272,16 +312,17 @@ export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
     } else {
       setTimeout(() => destRef.current?.focus(), 50);
     }
-  }, [destCommitted, completeLocation]);
+  }, [destCommitted, completeLocation, setField]);
 
   const handleDestSelect = useCallback((city: string) => {
     setDest(city);
+    setField("destination", city, "form");
     setDestCommitted(true);
     // If origin is already committed, complete location now
     if (originCommitted) {
       completeLocation();
     }
-  }, [originCommitted, completeLocation]);
+  }, [originCommitted, completeLocation, setField]);
 
   // ── Calendar onSelect handlers ──
   // Dates auto-complete the moment BOTH dates are chosen.
@@ -289,22 +330,24 @@ export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
   const handleDropDateSelect = useCallback((d: Date | undefined) => {
     setDropDate(d);
     setDropOpen(false);
+    setField("dropOffDate", d ? format(d, "yyyy-MM-dd") : "", "form");
     if (d && delivDate && !isBefore(delivDate, d)) {
       // Both dates now valid — complete dates
       completeDates(d, delivDate);
     } else if (!delivDate) {
       setTimeout(() => setDelivOpen(true), 150);
     }
-  }, [delivDate, completeDates]);
+  }, [delivDate, completeDates, setField]);
 
   const handleDelivDateSelect = useCallback((d: Date | undefined) => {
     setDelivDate(d);
     setDelivOpen(false);
+    setField("deliveryDate", d ? format(d, "yyyy-MM-dd") : "", "form");
     if (dropDate && d) {
       // Both dates now valid — complete dates
       completeDates(dropDate, d);
     }
-  }, [dropDate, completeDates]);
+  }, [dropDate, completeDates, setField]);
 
   return (
     <div>
@@ -316,6 +359,8 @@ export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
       )}
 
       <div style={{ maxWidth: 780, margin: resultsLoaded ? "8px auto 0" : "20px auto 0", padding: "0 16px" }}>
+
+        {apiConfig.useConcierge && <ConciergePanel />}
 
         {/* ═══ SECTION 1: LOCATION ═══ */}
         <div className="ss-card" style={{ zIndex: 10, animation: "fadeUp .3s both", transition: "all 0.3s ease" }}>
@@ -337,15 +382,15 @@ export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
               </div>
               <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                 <CityInput
-                  value={origin} onChange={setOrigin}
+                  value={origin} onChange={(v) => { setOrigin(v); setField("origin", v, "form"); }}
                   onSelect={handleOriginSelect}
                   placeholder="From city or ZIP" icon={"\u25C9"}
                 />
-                <div onClick={() => { const t = origin; setOrigin(dest); setDest(t); }}
+                <div onClick={() => { const t = origin; setOrigin(dest); setDest(t); setField("origin", dest, "form"); setField("destination", t, "form"); }}
                   style={{ width: 36, height: 36, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", background: "#f3f4f6", cursor: "pointer", fontSize: 14, color: "#6b7280", flexShrink: 0, marginTop: 2, transition: "all 0.2s ease" }}
                   title="Swap">{"\u21C4"}</div>
                 <CityInput
-                  inputRef={destRef} value={dest} onChange={setDest}
+                  inputRef={destRef} value={dest} onChange={(v) => { setDest(v); setField("destination", v, "form"); }}
                   onSelect={handleDestSelect}
                   placeholder="To city or ZIP" icon={"\u25CE"}
                 />
@@ -526,7 +571,7 @@ export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
                           cursor: "pointer", fontWeight: shipmentPriority === p ? 600 : 500,
                           fontFamily: "inherit", transition: "all 0.2s ease",
                         }}
-                        onClick={() => setShipmentPriority(p)}
+                        onClick={() => { setShipmentPriority(p); setField("priority", p, "form"); }}
                       >{PRIORITY_LABELS[p]}</button>
                     ))}
                   </div>
@@ -624,5 +669,13 @@ export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
         <SaveSignInModal open={signInModalOpen} onOpenChange={setSignInModalOpen} onSignInComplete={handleSignInComplete} />
       </div>
     </div>
+  );
+}
+
+export default function HomePage(props: HomePageProps) {
+  return (
+    <ShipmentDraftProvider>
+      <HomePageInner {...props} />
+    </ShipmentDraftProvider>
   );
 }
