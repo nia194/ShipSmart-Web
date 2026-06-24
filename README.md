@@ -27,7 +27,7 @@ and the Python AI/orchestration API
 - [Deployment (Render)](#deployment-render)
 - [Cross-service contracts](#cross-service-contracts)
 - [Operational notes](#operational-notes)
-- [Planned: Hybrid Form ⇄ Chat Sync](#planned-hybrid-form--chat-sync)
+- [Hybrid Form ⇄ Chat Sync](#hybrid-form--chat-sync)
 - [License](#license)
 
 ---
@@ -88,6 +88,7 @@ without auth — it returns ranking/insight data only.
 | Saved options | Java `/api/v1/saved-options` | Authenticated CRUD. Falls back to a Supabase edge function when `VITE_USE_JAVA_SAVED_OPTIONS=false`. |
 | Booking redirect | Java `/api/v1/bookings/redirect` | Hands off to carrier with tracking enabled (`VITE_USE_JAVA_BOOKING_REDIRECT`). |
 | Multi-agent workflow (UC3/UC4) | Python `/api/v1/workflow/{process,{id},{id}/review}` | Optional showcase page (`src/components/workflow/`, `src/pages/WorkflowPage.tsx`): run a shipment through the multi-agent workflow, and when it suspends on an unverified high-risk area, clear/block it as a human reviewer. Gated behind `VITE_USE_WORKFLOW` (route + nav hidden when off). |
+| Shipping concierge (form ⇄ chat) | Python `/api/v1/concierge/chat` | A chat panel (`src/components/advisor/ConciergePanel.tsx`) sharing one `ShipmentDraft` store (`src/state/`) with the form: chat fills the form fields and the form's values stop the chat re-asking, with a confirm on conflicts. Gated behind `VITE_USE_CONCIERGE` (hidden when off). |
 
 ---
 
@@ -175,6 +176,9 @@ VITE_USE_JAVA_BOOKING_REDIRECT=true
 
 # Multi-agent workflow page (UC3/UC4) — off by default (route + nav hidden).
 VITE_USE_WORKFLOW=false
+
+# Conversational Concierge chat on the home page — off by default (panel hidden).
+VITE_USE_CONCIERGE=false
 ```
 
 Without `VITE_SUPABASE_ANON_KEY` the Supabase client cannot initialize
@@ -205,7 +209,7 @@ their deployed equivalents.
 | `pnpm preview` | Serve the built `dist/` locally to smoke-test the production bundle. |
 | `pnpm typecheck` | `tsc -b --noEmit` — catch type errors without emitting JS. |
 | `pnpm lint` | ESLint across the repo. |
-| `pnpm test` | Vitest one-shot run (41 tests, jsdom). |
+| `pnpm test` | Vitest one-shot run (53 tests, jsdom). |
 | `pnpm test:watch` | Vitest in watch mode. |
 
 ### Tests
@@ -221,6 +225,8 @@ Vitest + `@testing-library/react` (jsdom), under `src/`:
 | `components/shipping/CompareSection.test.tsx` | Loading state + comparison grid render from a fixture. |
 | `lib/workflow-api.test.ts` | Workflow error taxonomy → friendly copy, advisory `verdictLabel` mapping, input cap. |
 | `components/workflow/WorkflowPage.test.tsx` | Submit → suspended (`awaiting_review`) result + review panel → clear → completed. |
+| `state/shipmentDraft.test.ts` | The shared-draft merge rules (conflict/provenance) + the concierge adapters (diff-only back-channel). |
+| `components/advisor/ConciergePanel.test.tsx` | Chat → reply, the back-channel patch fills the form, and the chat-vs-form conflict confirm. |
 
 The TS response interfaces in `src/lib/advisor-api.ts`, `src/lib/workflow-api.ts`, and `src/components/shipping/compare.types.ts` are also asserted against the backend schemas from `ShipSmart-Test/contract/`.
 
@@ -270,6 +276,9 @@ lockstep:
 - `src/lib/workflow-api.ts` ↔ the Python `/api/v1/workflow/*` schemas
   (`WorkflowResponse`, `ComplianceSummary`, HS/duty/carrier/doc domain
   types) — asserted by `ShipSmart-Test/contract/`
+- `src/lib/concierge-api.ts` + `src/state/shipmentDraft.ts` ↔ the Python
+  `/api/v1/concierge/chat` schema + slot superset (the shared shipment context the
+  form and the chat both populate) — asserted by `ShipSmart-Test/contract/`
 
 ---
 
@@ -294,21 +303,15 @@ lockstep:
 
 ---
 
-## Planned: Hybrid Form ⇄ Chat Sync
+## Hybrid Form ⇄ Chat Sync
 
-> **Status: planned — not yet implemented.** Documents an upcoming change so the
-> design is on record ahead of the code. None of the modules, the state store, or the
-> behavior below exists yet.
+The shipment **form** and a conversational **concierge chat** are two views over **one
+shared shipment draft**: type "Atlanta → Seattle, 12 lb" in the chat and the route /
+weight fields fill in; fill the form and the chat already knows and won't re-ask. Gated by
+`VITE_USE_CONCIERGE` (off by default → the panel is hidden and the form behaves exactly as
+before). The **bulk of this feature lives in this repo.**
 
-Today the shipment **form** (`HomePage.tsx`) feeds the advisor panel
-(`AdvisorPanel.tsx`) through a **read-only, one-way** `context` prop — nothing the
-user types in chat flows back to the form. The planned change makes the form and a
-conversational **concierge chat** two views over **one shared shipment draft**: type
-"Atlanta → Seattle, 12 lb, by Friday" in chat and the route / weight / date fields
-fill in; fill the form and the chat already knows and won't re-ask. The **bulk of this
-feature lives in this repo.**
-
-Planned shape:
+How it works:
 
 - **One shared `ShipmentDraft` store** (`src/state/shipmentDraft.ts`,
   `ShipmentDraftContext.tsx`) — a typed superset of every field either surface can
@@ -316,21 +319,24 @@ Planned shape:
   `Tracked<T> { value, source, at }` for provenance (`"form" | "chat" | "hydrated"`).
   Reuses the existing `PackageItem` / `Priority` types (no parallel models) and React
   Context + reducer (no new state-management dependency).
-- **Deterministic merge rules** (pure, unit-tested): empty never overwrites non-empty;
-  most-recent explicit user write wins by timestamp; `hydrated` (Java) loses to explicit
-  user writes; normalize before compare; chat fills only *empty* primary-item fields.
-- **Both surfaces bind to the store.** `HomePage`'s shipment `useState`s become
-  reads/writes against the store (section-completion and quote-fetch behavior preserved);
-  the chat panel derives its state from the store and patches it back through two pure
-  adapters — `draftToConciergeState(draft)` and `conciergeStateToPatch(state)`.
-- **The "don't re-ask" UX** — because the chat sends the full draft, the server won't
-  ask for form-filled fields; chat-filled fields appear in the form with a subtle
-  "✦ from chat" hint. A single "Start over" resets both the draft and the chat thread.
+- **Deterministic merge rules** (pure, unit-tested in `state/shipmentDraft.test.ts`): empty
+  never overwrites non-empty; a manual form edit always wins; chat fills empty fields freely
+  but a genuine chat-vs-form conflict is **surfaced for confirmation, never silently
+  applied**; `hydrated` (Java) loses to explicit user writes; normalize before compare so
+  "Atlanta" == "Atlanta, GA"; chat fills only the empty numeric primary-item fields.
+- **Both surfaces bind to the store.** `HomePage` writes its form fields to the store on
+  edit and reflects chat patches back into the inputs (the wizard's section-completion and
+  quote-fetch flow is preserved); `ConciergePanel` derives its conversation state from the
+  store and patches it back through two pure adapters — `draftToConciergeState(draft)` and
+  `conciergeStateToPatch(state)` (which diffs the echoed state and applies only real changes).
+- **The "don't re-ask" UX** — because the chat sends the full draft, the server won't ask
+  for form-filled fields; chat-extracted values appear in the form fields directly, and a
+  conflicting suggestion shows a one-line "keep X or use Y?" confirm. A single "Start over"
+  resets both the draft and the chat thread.
 
-**Depends on the (also-planned) Conversational Concierge** chat endpoint
-(`POST /api/v1/concierge/chat`, a slot-filling `ConversationState`) in ShipSmart-API.
-**Backward-compatible and off by default** — with chat unused, the form behaves exactly
-as it does today.
+Backed by the **Conversational Concierge** chat endpoint (`POST /api/v1/concierge/chat`, a
+slot-filling `ConversationState`) in ShipSmart-API. **Backward-compatible and off by
+default** — with the chat hidden, the form behaves exactly as it does today.
 
 ---
 
