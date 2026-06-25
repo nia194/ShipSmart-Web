@@ -7,6 +7,7 @@
  */
 import { useState } from "react";
 
+import { isDomesticOnly } from "@/config/api";
 import { type WorkflowResponse, verdictLabel } from "@/lib/workflow-api";
 
 const STATUS_STYLE: Record<string, { bg: string; fg: string }> = {
@@ -54,14 +55,17 @@ export function WorkflowResult({ state }: { state: WorkflowResponse }) {
             {state.hs_code ? <><strong>{state.hs_code}</strong> — {state.hs_title}</> : "—"}
           </div>
         </div>
-        <div style={card}>
-          <div style={h}>Landed cost</div>
-          <div style={{ fontSize: 14 }}>
-            {lc ? <>${lc.total_landed_usd.toFixed(2)} <span style={{ color: "#9ca3af", fontSize: 12 }}>
-              (duty ${lc.duty_usd.toFixed(2)} + {lc.tax_label} ${lc.tax_usd.toFixed(2)})</span></> : "—"}
+        {/* Landed cost is duties + customs — an international concern; hidden when domestic. */}
+        {!isDomesticOnly && (
+          <div style={card}>
+            <div style={h}>Landed cost</div>
+            <div style={{ fontSize: 14 }}>
+              {lc ? <>${lc.total_landed_usd.toFixed(2)} <span style={{ color: "#9ca3af", fontSize: 12 }}>
+                (duty ${lc.duty_usd.toFixed(2)} + {lc.tax_label} ${lc.tax_usd.toFixed(2)})</span></> : "—"}
+            </div>
+            {lc?.trade_note && <div style={{ fontSize: 11, color: "#16a34a" }}>{lc.trade_note}</div>}
           </div>
-          {lc?.trade_note && <div style={{ fontSize: 11, color: "#16a34a" }}>{lc.trade_note}</div>}
-        </div>
+        )}
         <div style={card}>
           <div style={h}>Recommended carrier</div>
           <div style={{ fontSize: 14 }}>
