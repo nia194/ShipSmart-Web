@@ -52,7 +52,21 @@ export const apiConfig = {
    * Defaults to false (the panel stays hidden; the form behaves exactly as today).
    */
   useConcierge: import.meta.env.VITE_USE_CONCIERGE === "true",
+
+  /**
+   * Shipping-scope policy (mirrors the API's SHIPPING_SCOPE; published on
+   * GET /api/v1/info). "worldwide" (default) = cross-border allowed;
+   * "domestic" = deliveries within DOMESTIC_COUNTRY only — the form hides the
+   * country fields and the result hides duties. Set VITE_SHIPPING_SCOPE=domestic.
+   */
+  shippingScope: import.meta.env.VITE_SHIPPING_SCOPE ?? "worldwide",
+
+  /** Home country used when shippingScope === "domestic". */
+  domesticCountry: import.meta.env.VITE_DOMESTIC_COUNTRY ?? "US",
 } as const;
+
+/** True when this deployment only ships within {@link apiConfig.domesticCountry}. */
+export const isDomesticOnly = apiConfig.shippingScope === "domestic";
 
 /** Pre-built API path helpers */
 export const javaApi = {

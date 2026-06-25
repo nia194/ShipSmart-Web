@@ -8,6 +8,7 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
 
+import { apiConfig, isDomesticOnly } from "@/config/api";
 import {
   WORKFLOW_MAX_DESCRIPTION_LENGTH,
   type WorkflowProcessRequest,
@@ -27,8 +28,11 @@ const labelStyle: React.CSSProperties = {
 };
 
 export function WorkflowForm({ onSubmit, busy = false }: WorkflowFormProps) {
-  const [origin, setOrigin] = useState("US");
-  const [destination, setDestination] = useState("BR");
+  // Domestic-only deployments pin both ends to the home country and hide the
+  // country fields; worldwide keeps the cross-border inputs.
+  const home = apiConfig.domesticCountry.toUpperCase();
+  const [origin, setOrigin] = useState(isDomesticOnly ? home : "US");
+  const [destination, setDestination] = useState(isDomesticOnly ? home : "BR");
   const [value, setValue] = useState("600");
   const [weight, setWeight] = useState("3");
   const [description, setDescription] = useState("camera drone with lithium battery");
@@ -37,8 +41,8 @@ export function WorkflowForm({ onSubmit, busy = false }: WorkflowFormProps) {
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     onSubmit({
-      origin_country: origin.trim().toUpperCase(),
-      destination_country: destination.trim().toUpperCase(),
+      origin_country: isDomesticOnly ? home : origin.trim().toUpperCase(),
+      destination_country: isDomesticOnly ? home : destination.trim().toUpperCase(),
       declared_value_usd: Number(value) || 0,
       weight_lbs: Number(weight) || 0,
       description: description.slice(0, WORKFLOW_MAX_DESCRIPTION_LENGTH),
@@ -48,17 +52,29 @@ export function WorkflowForm({ onSubmit, busy = false }: WorkflowFormProps) {
 
   return (
     <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
+      {isDomesticOnly ? (
+        <div style={{
+          gridColumn: "1 / -1", fontSize: 12, color: "#374151",
+          background: "#f3f4f6", borderRadius: 8, padding: "8px 10px",
+        }}>
+          Shipping within <strong>{home}</strong> only (domestic).
+        </div>
+      ) : null}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <div>
-          <label style={labelStyle} htmlFor="wf-origin">Origin (ISO-2)</label>
-          <input id="wf-origin" style={inputStyle} value={origin} maxLength={2}
-            onChange={(e) => setOrigin(e.target.value)} required />
-        </div>
-        <div>
-          <label style={labelStyle} htmlFor="wf-dest">Destination (ISO-2)</label>
-          <input id="wf-dest" style={inputStyle} value={destination} maxLength={2}
-            onChange={(e) => setDestination(e.target.value)} required />
-        </div>
+        {!isDomesticOnly && (
+          <>
+            <div>
+              <label style={labelStyle} htmlFor="wf-origin">Origin (ISO-2)</label>
+              <input id="wf-origin" style={inputStyle} value={origin} maxLength={2}
+                onChange={(e) => setOrigin(e.target.value)} required />
+            </div>
+            <div>
+              <label style={labelStyle} htmlFor="wf-dest">Destination (ISO-2)</label>
+              <input id="wf-dest" style={inputStyle} value={destination} maxLength={2}
+                onChange={(e) => setDestination(e.target.value)} required />
+            </div>
+          </>
+        )}
         <div>
           <label style={labelStyle} htmlFor="wf-value">Declared value (USD)</label>
           <input id="wf-value" style={inputStyle} type="number" min={0} value={value}
