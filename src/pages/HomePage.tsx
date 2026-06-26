@@ -8,7 +8,7 @@ import { CityInput } from "@/components/shipping/CityInput";
 import { StepNum } from "@/components/shipping/SharedUI";
 import { Section } from "@/components/shipping/QuoteRow";
 import { CompareSection } from "@/components/shipping/CompareSection";
-import { PackageTypeDropdown } from "@/components/shipping/PackageTypeDropdown";
+import { PackageTypeDropdown } from "@/components/shipping/PackageTypeDropDown";
 import {
   PKG_TYPES,
   HANDLING,
@@ -861,7 +861,7 @@ export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
                 </div>
 
                 <CityInput
-                  inputRef={destRef}
+                  inputRef={destRef as React.RefObject<HTMLInputElement>}
                   value={dest}
                   onChange={setDest}
                   onSelect={handleDestSelect}
