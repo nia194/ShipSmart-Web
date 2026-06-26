@@ -284,7 +284,10 @@ function OptionCard({
   canRemove: boolean;
   onRemove: (id: string) => void;
 }) {
-  const role = getFallbackRole(option, index, selectedOptions, priority);
+  const role =
+    insight?.role_label ??
+    getFallbackRole(option, index, selectedOptions, priority);
+
   const primary = getInsightPrimary(insight, option);
   const tradeoff = getInsightTradeoff(insight, option);
 
@@ -499,7 +502,7 @@ function AddOptionCard({
               cursor: "pointer",
             }}
           >
-            + Add option
+            + Add carrier
           </button>
         </PopoverTrigger>
 
@@ -531,7 +534,8 @@ function AddOptionCard({
                   marginTop: 2,
                 }}
               >
-                {formatMoney(option.price_usd)} · {formatDays(option.transit_days)}
+                {formatMoney(option.price_usd)} ·{" "}
+                {formatDays(option.transit_days)}
               </span>
             </button>
           ))}
@@ -602,8 +606,7 @@ function ComparisonRows({
 
       {BASE_ROWS.map((row) => {
         const dimension = findDimension(dimensions, row);
-        const winnerId =
-          dimension?.winner_id ?? getFallbackWinner(row, options);
+        const winnerId = dimension?.winner_id ?? getFallbackWinner(row, options);
 
         return (
           <div
@@ -854,7 +857,7 @@ export const CompareSection: React.FC<CompareSectionProps> = ({
               letterSpacing: "-.2px",
             }}
           >
-            Compare service options
+            Compare Service Options
           </div>
 
           <div
@@ -926,7 +929,8 @@ export const CompareSection: React.FC<CompareSectionProps> = ({
                 fontWeight: 650,
               }}
             >
-              AI comparison is unavailable, so showing a simple carrier-data comparison.
+              AI comparison is unavailable, so showing a simple carrier-data
+              comparison.
             </div>
           )}
 
