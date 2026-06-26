@@ -27,6 +27,7 @@ and the Python AI/orchestration API
 - [Deployment (Render)](#deployment-render)
 - [Cross-service contracts](#cross-service-contracts)
 - [Operational notes](#operational-notes)
+- [Hybrid Form ⇄ Chat Sync](#hybrid-form--chat-sync)
 - [License](#license)
 
 ---
@@ -40,7 +41,7 @@ siblings of this directory when working on the full system.
 |---|---|---|
 | **[ShipSmart-Web](https://github.com/nia194/ShipSmart-Web)** *(this repo)* | React SPA — user-facing UI | React 19, Vite, TS |
 | [ShipSmart-Orchestrator](https://github.com/nia194/ShipSmart-Orchestrator) | Java transactional API — **single writer** to Supabase Postgres; quotes, bookings, saved options, carrier integration | Spring Boot 3.4, Java 17 |
-| [ShipSmart-API](https://github.com/nia194/ShipSmart-API) | Python AI/orchestration service — RAG, advisors, recommendations | FastAPI, Python 3.13 |
+| [ShipSmart-API](https://github.com/nia194/ShipSmart-API) | Python AI/orchestration service — RAG, advisors, recommendations, compliance (UC2), multi-agent workflow (UC3/UC4) | FastAPI, Python 3.13 |
 | [ShipSmart-MCP](https://github.com/nia194/ShipSmart-MCP) | MCP tool server — `validate_address`, `get_quote_preview` (provider-pluggable) | FastAPI + MCP |
 | [ShipSmart-Infra](https://github.com/nia194/ShipSmart-Infra) | Supabase migrations + edge functions, deployment configs, docs | Supabase, Render blueprints |
 
@@ -86,6 +87,8 @@ without auth — it returns ranking/insight data only.
 | Shipment advisor | Python `/api/v1/advisor/{shipping,tracking}` | Shipment-scoped Q&A panel (`src/components/advisor/`) with provenance badges + source citations. Read-only hydrates context from Java `GET /api/v1/shipments/{id}`. Degrades gracefully — advisor errors never affect quotes/bookings. |
 | Saved options | Java `/api/v1/saved-options` | Authenticated CRUD. Falls back to a Supabase edge function when `VITE_USE_JAVA_SAVED_OPTIONS=false`. |
 | Booking redirect | Java `/api/v1/bookings/redirect` | Hands off to carrier with tracking enabled (`VITE_USE_JAVA_BOOKING_REDIRECT`). |
+| Multi-agent workflow (UC3/UC4) | Python `/api/v1/workflow/{process,{id},{id}/review}` | Optional showcase page (`src/components/workflow/`, `src/pages/WorkflowPage.tsx`): run a shipment through the multi-agent workflow, and when it suspends on an unverified high-risk area, clear/block it as a human reviewer. Gated behind `VITE_USE_WORKFLOW` (route + nav hidden when off). |
+| Shipping concierge (form ⇄ chat) | Python `/api/v1/concierge/chat` | A chat panel (`src/components/advisor/ConciergePanel.tsx`) sharing one `ShipmentDraft` store (`src/state/`) with the form: chat fills the form fields and the form's values stop the chat re-asking, with a confirm on conflicts. Gated behind `VITE_USE_CONCIERGE` (hidden when off). |
 
 ---
 
@@ -95,9 +98,10 @@ without auth — it returns ranking/insight data only.
 src/
 ├── main.tsx                       React entry
 ├── App.tsx                        Router shell + top nav
-├── pages/                         Route components (HomePage, AuthPage, SavedPage, NotFound)
+├── pages/                         Route components (HomePage, AuthPage, SavedPage, WorkflowPage, NotFound)
 ├── components/
 │   ├── auth/                      SaveSignInModal (sign-in prompt before saving)
+│   ├── workflow/                  Workflow UI (UC3/UC4): WorkflowForm, WorkflowResult, ReviewPanel — gated on VITE_USE_WORKFLOW
 │   ├── shipping/                  Core comparison UI + its API/types
 │   │   ├── CompareSection.tsx     Results list + comparison view
 │   │   ├── compare.api.ts         Python /api/v1/compare fetch helper
@@ -112,6 +116,8 @@ src/
 │       └── types.ts
 ├── lib/
 │   ├── http.ts                    Shared fetch wrapper: mints X-Request-Id + W3C traceparent, attaches Supabase JWT, optional Idempotency-Key, parses RFC 7807 ProblemDetail
+│   ├── advisor-api.ts             Typed client for the Python advisor endpoints (via http)
+│   ├── workflow-api.ts            Typed client for the Python /workflow endpoints (UC3/UC4, via http)
 │   ├── shipping-data.ts           Static carrier/service reference data + helpers
 │   └── utils.ts
 ├── config/
@@ -167,6 +173,12 @@ VITE_APP_ENV=development
 VITE_USE_JAVA_QUOTES=true
 VITE_USE_JAVA_SAVED_OPTIONS=true
 VITE_USE_JAVA_BOOKING_REDIRECT=true
+
+# Multi-agent workflow page (UC3/UC4) — off by default (route + nav hidden).
+VITE_USE_WORKFLOW=false
+
+# Conversational Concierge chat on the home page — off by default (panel hidden).
+VITE_USE_CONCIERGE=false
 ```
 
 Without `VITE_SUPABASE_ANON_KEY` the Supabase client cannot initialize
@@ -197,7 +209,7 @@ their deployed equivalents.
 | `pnpm preview` | Serve the built `dist/` locally to smoke-test the production bundle. |
 | `pnpm typecheck` | `tsc -b --noEmit` — catch type errors without emitting JS. |
 | `pnpm lint` | ESLint across the repo. |
-| `pnpm test` | Vitest one-shot run (30 tests, jsdom). |
+| `pnpm test` | Vitest one-shot run (53 tests, jsdom). |
 | `pnpm test:watch` | Vitest in watch mode. |
 
 ### Tests
@@ -211,8 +223,12 @@ Vitest + `@testing-library/react` (jsdom), under `src/`:
 | `hooks/useShippingQuotes.test.ts` / `hooks/useSavedOptions.test.ts` | The Java-vs-Supabase backend toggle and signed-in/out state. |
 | `components/advisor/AdvisorPanel.test.tsx` | Provenance badges, citations, graceful error states, client validation. |
 | `components/shipping/CompareSection.test.tsx` | Loading state + comparison grid render from a fixture. |
+| `lib/workflow-api.test.ts` | Workflow error taxonomy → friendly copy, advisory `verdictLabel` mapping, input cap. |
+| `components/workflow/WorkflowPage.test.tsx` | Submit → suspended (`awaiting_review`) result + review panel → clear → completed. |
+| `state/shipmentDraft.test.ts` | The shared-draft merge rules (conflict/provenance) + the concierge adapters (diff-only back-channel). |
+| `components/advisor/ConciergePanel.test.tsx` | Chat → reply, the back-channel patch fills the form, and the chat-vs-form conflict confirm. |
 
-The TS response interfaces in `src/lib/advisor-api.ts` and `src/components/shipping/compare.types.ts` are also asserted against the backend schemas from `ShipSmart-Test/contract/`.
+The TS response interfaces in `src/lib/advisor-api.ts`, `src/lib/workflow-api.ts`, and `src/components/shipping/compare.types.ts` are also asserted against the backend schemas from `ShipSmart-Test/contract/`.
 
 ---
 
@@ -257,6 +273,12 @@ lockstep:
   the Python `/api/v1/compare` request/response schema
 - `compare.types.ts` also holds the canonical domain types (Shipment,
   CompareOption, OptionInsight, Scenario, etc.)
+- `src/lib/workflow-api.ts` ↔ the Python `/api/v1/workflow/*` schemas
+  (`WorkflowResponse`, `ComplianceSummary`, HS/duty/carrier/doc domain
+  types) — asserted by `ShipSmart-Test/contract/`
+- `src/lib/concierge-api.ts` + `src/state/shipmentDraft.ts` ↔ the Python
+  `/api/v1/concierge/chat` schema + slot superset (the shared shipment context the
+  form and the chat both populate) — asserted by `ShipSmart-Test/contract/`
 
 ---
 
@@ -278,6 +300,43 @@ lockstep:
   `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set in the Render
   dashboard (they are `sync: false` and won't be picked up from the
   blueprint).
+
+---
+
+## Hybrid Form ⇄ Chat Sync
+
+The shipment **form** and a conversational **concierge chat** are two views over **one
+shared shipment draft**: type "Atlanta → Seattle, 12 lb" in the chat and the route /
+weight fields fill in; fill the form and the chat already knows and won't re-ask. Gated by
+`VITE_USE_CONCIERGE` (off by default → the panel is hidden and the form behaves exactly as
+before). The **bulk of this feature lives in this repo.**
+
+How it works:
+
+- **One shared `ShipmentDraft` store** (`src/state/shipmentDraft.ts`,
+  `ShipmentDraftContext.tsx`) — a typed superset of every field either surface can
+  gather, backed by a pure `useReducer`. Scalar fields are wrapped in
+  `Tracked<T> { value, source, at }` for provenance (`"form" | "chat" | "hydrated"`).
+  Reuses the existing `PackageItem` / `Priority` types (no parallel models) and React
+  Context + reducer (no new state-management dependency).
+- **Deterministic merge rules** (pure, unit-tested in `state/shipmentDraft.test.ts`): empty
+  never overwrites non-empty; a manual form edit always wins; chat fills empty fields freely
+  but a genuine chat-vs-form conflict is **surfaced for confirmation, never silently
+  applied**; `hydrated` (Java) loses to explicit user writes; normalize before compare so
+  "Atlanta" == "Atlanta, GA"; chat fills only the empty numeric primary-item fields.
+- **Both surfaces bind to the store.** `HomePage` writes its form fields to the store on
+  edit and reflects chat patches back into the inputs (the wizard's section-completion and
+  quote-fetch flow is preserved); `ConciergePanel` derives its conversation state from the
+  store and patches it back through two pure adapters — `draftToConciergeState(draft)` and
+  `conciergeStateToPatch(state)` (which diffs the echoed state and applies only real changes).
+- **The "don't re-ask" UX** — because the chat sends the full draft, the server won't ask
+  for form-filled fields; chat-extracted values appear in the form fields directly, and a
+  conflicting suggestion shows a one-line "keep X or use Y?" confirm. A single "Start over"
+  resets both the draft and the chat thread.
+
+Backed by the **Conversational Concierge** chat endpoint (`POST /api/v1/concierge/chat`, a
+slot-filling `ConversationState`) in ShipSmart-API. **Backward-compatible and off by
+default** — with the chat hidden, the form behaves exactly as it does today.
 
 ---
 

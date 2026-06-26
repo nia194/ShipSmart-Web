@@ -1758,3 +1758,11 @@ export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
     </div>
   );
 }
+
+export default function HomePage(props: HomePageProps) {
+  return (
+    <ShipmentDraftProvider>
+      <HomePageInner {...props} />
+    </ShipmentDraftProvider>
+  );
+}

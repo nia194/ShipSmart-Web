@@ -38,7 +38,35 @@ export const apiConfig = {
    * Defaults to false (legacy Supabase edge function).
    */
   useJavaBookingRedirect: import.meta.env.VITE_USE_JAVA_BOOKING_REDIRECT === "true",
+
+  /**
+   * Feature flag: show the multi-agent workflow page (UC3/UC4) backed by the
+   * Python API's /workflow endpoints. Set VITE_USE_WORKFLOW=true to enable.
+   * Defaults to false (the route + nav entry stay hidden).
+   */
+  useWorkflow: import.meta.env.VITE_USE_WORKFLOW === "true",
+
+  /**
+   * Feature flag: show the Conversational Concierge chat, shared with the form
+   * via the ShipmentDraft store. Set VITE_USE_CONCIERGE=true to enable.
+   * Defaults to false (the panel stays hidden; the form behaves exactly as today).
+   */
+  useConcierge: import.meta.env.VITE_USE_CONCIERGE === "true",
+
+  /**
+   * Shipping-scope policy (mirrors the API's SHIPPING_SCOPE; published on
+   * GET /api/v1/info). "worldwide" (default) = cross-border allowed;
+   * "domestic" = deliveries within DOMESTIC_COUNTRY only — the form hides the
+   * country fields and the result hides duties. Set VITE_SHIPPING_SCOPE=domestic.
+   */
+  shippingScope: import.meta.env.VITE_SHIPPING_SCOPE ?? "worldwide",
+
+  /** Home country used when shippingScope === "domestic". */
+  domesticCountry: import.meta.env.VITE_DOMESTIC_COUNTRY ?? "US",
 } as const;
+
+/** True when this deployment only ships within {@link apiConfig.domesticCountry}. */
+export const isDomesticOnly = apiConfig.shippingScope === "domestic";
 
 /** Pre-built API path helpers */
 export const javaApi = {
@@ -53,4 +81,10 @@ export const javaApi = {
 export const pythonApi = {
   advisorShipping: () => `${apiConfig.pythonApiBaseUrl}/api/v1/advisor/shipping`,
   advisorTracking: () => `${apiConfig.pythonApiBaseUrl}/api/v1/advisor/tracking`,
+  /** Multi-agent workflow (UC3/UC4). */
+  workflowProcess: () => `${apiConfig.pythonApiBaseUrl}/api/v1/workflow/process`,
+  workflow: (id: string) => `${apiConfig.pythonApiBaseUrl}/api/v1/workflow/${id}`,
+  workflowReview: (id: string) => `${apiConfig.pythonApiBaseUrl}/api/v1/workflow/${id}/review`,
+  /** Conversational Concierge — stateful slot-filling chat. */
+  conciergeChat: () => `${apiConfig.pythonApiBaseUrl}/api/v1/concierge/chat`,
 } as const;

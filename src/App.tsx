@@ -11,11 +11,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useSavedOptions } from "@/hooks/useSavedOptions";
 import NotFound from "@/pages/NotFound";
+import { apiConfig } from "@/config/api";
 import "@/styles/shipsmart.css";
 
 const HomePage = lazy(() => import("@/pages/HomePage"));
 const SavedPage = lazy(() => import("@/pages/SavedPage"));
 const AuthPage = lazy(() => import("@/pages/AuthPage"));
+const WorkflowPage = lazy(() => import("@/pages/WorkflowPage"));
 
 const PageLoader = () => (
   <div
