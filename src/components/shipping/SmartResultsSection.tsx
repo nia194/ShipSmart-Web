@@ -136,7 +136,7 @@ function RecommendationCard({
               flexShrink: 0,
             }}
           >
-            <Logo carrier={best.carrier} />
+            <Logo name={best.carrier} />
           </div>
 
           <div style={{ minWidth: 0 }}>
