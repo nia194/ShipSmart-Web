@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   type CompareRequest,
@@ -706,14 +706,24 @@ export const CompareSection: React.FC<CompareSectionProps> = ({
     ],
   );
 
-  useEffect(() => {
-    setState({
-      optionIds: selectDefaultOptions(allOptions, selectedPriority),
-      data: null,
-      isLoading: true,
-      error: null,
-    });
-  }, [optionKey, selectedPriority, allOptions]);
+const resetKeyRef = useRef(`${optionKey}|${selectedPriority}`);
+
+useEffect(() => {
+  const nextResetKey = `${optionKey}|${selectedPriority}`;
+
+  if (resetKeyRef.current === nextResetKey) {
+    return;
+  }
+
+  resetKeyRef.current = nextResetKey;
+
+  setState({
+    optionIds: selectDefaultOptions(allOptions, selectedPriority),
+    data: null,
+    isLoading: true,
+    error: null,
+  });
+}, [optionKey, selectedPriority, allOptions]);
 
   useEffect(() => {
     const selectedOptions = state.optionIds
