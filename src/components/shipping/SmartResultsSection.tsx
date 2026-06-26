@@ -396,7 +396,7 @@ function RankedQuoteRow({
               justifyContent: "center",
             }}
           >
-            <Logo carrier={service.carrier} />
+            <Logo name={service.carrier} />
           </div>
           <div
             style={{
