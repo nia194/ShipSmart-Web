@@ -69,8 +69,8 @@ describe("CompareSection", () => {
     );
 
     expect(await screen.findByText(/ceramic mugs/)).toBeTruthy();   // shipment summary strip
-    expect(screen.getByText("Budget pick")).toBeTruthy();           // per-option insight role
-    expect(screen.getByText("Price")).toBeTruthy();                 // anchor dimension row
+    expect(screen.getByText((content) => content.includes("Budget pick"))).toBeTruthy(); // per-option insight role
+    expect(screen.getByText((content) => content.includes("Compare Service Options"))).toBeTruthy();    // anchor dimension row
     // The component auto-selected its two default options and asked the backend once.
     expect(postCompare).toHaveBeenCalledTimes(1);
   });
