@@ -13,14 +13,17 @@ import { Logo } from "./Logo";
 
 const MAX_OPTIONS = 3;
 
-const PRIORITY_LABELS: Record<Priority, string> = {
-  ontime: "on-time delivery",
-  damage: "safer handling",
-  price: "lowest price",
-  speed: "fastest arrival",
-};
-
-const BASE_ROWS = ["Price", "Speed", "Reliability", "Insurance", "Tracking", "Handling"];
+interface CompareSectionProps {
+  shipment: {
+    item_description: string;
+    origin_zip: string;
+    destination_zip: string;
+    deadline_date: string;
+    weight_lb: number;
+  };
+  allOptions: CompareOption[];
+  selectedPriority: Priority;
+}
 
 type CompareState = {
   optionIds: string[];
@@ -28,6 +31,22 @@ type CompareState = {
   isLoading: boolean;
   error: string | null;
 };
+
+const PRIORITY_LABELS: Record<Priority, string> = {
+  ontime: "on-time delivery",
+  damage: "safer handling",
+  price: "lowest price",
+  speed: "fastest arrival",
+};
+
+const BASE_ROWS = [
+  "Price",
+  "Speed",
+  "Reliability",
+  "Insurance",
+  "Tracking",
+  "Handling",
+];
 
 function cleanName(carrier: string, serviceName: string): string {
   if (serviceName.startsWith(`${carrier} `)) {
@@ -108,7 +127,10 @@ function selectDefaultOptions(
   return selected.slice(0, MAX_OPTIONS);
 }
 
-function getInsightPrimary(insight: OptionInsight | undefined, option: CompareOption) {
+function getInsightPrimary(
+  insight: OptionInsight | undefined,
+  option: CompareOption,
+) {
   if (insight?.choose_when) return insight.choose_when;
   if (insight?.strength) return insight.strength;
 
@@ -119,7 +141,10 @@ function getInsightPrimary(insight: OptionInsight | undefined, option: CompareOp
   return "Good fit when your delivery window is flexible and price matters.";
 }
 
-function getInsightTradeoff(insight: OptionInsight | undefined, option: CompareOption) {
+function getInsightTradeoff(
+  insight: OptionInsight | undefined,
+  option: CompareOption,
+) {
   if (insight?.consideration) return insight.consideration;
   if (insight?.skip_when) return insight.skip_when;
 
@@ -168,12 +193,19 @@ function getFallbackValue(row: string, option: CompareOption): string {
   if (row === "Reliability") return option.guaranteed ? "Guaranteed" : "Estimated";
   if (row === "Insurance") return "Shown during booking";
   if (row === "Tracking") return "Carrier tracking";
-  if (row === "Handling") return option.guaranteed ? "Standard carrier handling" : "Standard handling";
+  if (row === "Handling") {
+    return option.guaranteed
+      ? "Standard carrier handling"
+      : "Standard handling";
+  }
 
   return "—";
 }
 
-function getFallbackWinner(row: string, options: CompareOption[]): string | null {
+function getFallbackWinner(
+  row: string,
+  options: CompareOption[],
+): string | null {
   if (options.length === 0) return null;
 
   if (row === "Price") {
@@ -211,7 +243,14 @@ function LoadingState() {
           marginBottom: 14,
         }}
       />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: 10,
+        }}
+      >
         {[1, 2, 3].map((item) => (
           <div
             key={item}
@@ -245,7 +284,7 @@ function OptionCard({
   canRemove: boolean;
   onRemove: (id: string) => void;
 }) {
-  const role = insight?.role_label || getFallbackRole(option, index, selectedOptions, priority);
+  const role = getFallbackRole(option, index, selectedOptions, priority);
   const primary = getInsightPrimary(insight, option);
   const tradeoff = getInsightTradeoff(insight, option);
 
@@ -284,8 +323,16 @@ function OptionCard({
         </button>
       )}
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, paddingRight: 24 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          paddingRight: 24,
+        }}
+      >
         <Logo name={option.carrier} sz={32} />
+
         <div style={{ minWidth: 0, textAlign: "left" }}>
           <div
             style={{
@@ -301,6 +348,7 @@ function OptionCard({
           >
             {displayName(option.carrier, option.service_name)}
           </div>
+
           <div
             style={{
               fontSize: 11,
@@ -310,7 +358,8 @@ function OptionCard({
               textAlign: "left",
             }}
           >
-            {formatDays(option.transit_days)} · {option.guaranteed ? "Guaranteed" : "Estimated"}
+            {formatDays(option.transit_days)} ·{" "}
+            {option.guaranteed ? "Guaranteed" : "Estimated"}
           </div>
         </div>
       </div>
@@ -371,7 +420,7 @@ function OptionCard({
             marginBottom: 5,
           }}
         >
-          LLM tradeoff summary
+          AI tradeoff summary
         </div>
 
         <div
@@ -474,7 +523,14 @@ function AddOptionCard({
               }}
             >
               {displayName(option.carrier, option.service_name)}
-              <span style={{ display: "block", color: "#94a3b8", fontSize: 11, marginTop: 2 }}>
+              <span
+                style={{
+                  display: "block",
+                  color: "#94a3b8",
+                  fontSize: 11,
+                  marginTop: 2,
+                }}
+              >
                 {formatMoney(option.price_usd)} · {formatDays(option.transit_days)}
               </span>
             </button>
@@ -546,7 +602,8 @@ function ComparisonRows({
 
       {BASE_ROWS.map((row) => {
         const dimension = findDimension(dimensions, row);
-        const winnerId = dimension?.winner_id ?? getFallbackWinner(row, options);
+        const winnerId =
+          dimension?.winner_id ?? getFallbackWinner(row, options);
 
         return (
           <div
@@ -554,7 +611,10 @@ function ComparisonRows({
             style={{
               display: "grid",
               gridTemplateColumns: `140px repeat(${options.length}, minmax(0, 1fr))`,
-              borderBottom: row === BASE_ROWS[BASE_ROWS.length - 1] ? "none" : "1px solid #f1f5f9",
+              borderBottom:
+                row === BASE_ROWS[BASE_ROWS.length - 1]
+                  ? "none"
+                  : "1px solid #f1f5f9",
             }}
           >
             <div
@@ -570,7 +630,8 @@ function ComparisonRows({
             </div>
 
             {options.map((option) => {
-              const value = dimension?.values?.[option.id] ?? getFallbackValue(row, option);
+              const value =
+                dimension?.values?.[option.id] ?? getFallbackValue(row, option);
               const isWinner = winnerId === option.id;
 
               return (
@@ -616,7 +677,10 @@ export const CompareSection: React.FC<CompareSectionProps> = ({
   const optionKey = useMemo(
     () =>
       allOptions
-        .map((option) => `${option.id}:${option.price_usd}:${option.transit_days}:${option.guaranteed}`)
+        .map(
+          (option) =>
+            `${option.id}:${option.price_usd}:${option.transit_days}:${option.guaranteed}`,
+        )
         .sort()
         .join("|"),
     [allOptions],
@@ -746,7 +810,6 @@ export const CompareSection: React.FC<CompareSectionProps> = ({
   );
 
   const activeScenario = state.data?.scenarios?.[selectedPriority];
-
   const dimensions = activeScenario?.comparison_dimensions ?? [];
 
   const insightsById = useMemo(() => {
@@ -762,7 +825,8 @@ export const CompareSection: React.FC<CompareSectionProps> = ({
   if (allOptions.length < 2) return null;
 
   const canRemove = selectedOptions.length > 2;
-  const canAdd = selectedOptions.length < MAX_OPTIONS && remainingOptions.length > 0;
+  const canAdd =
+    selectedOptions.length < MAX_OPTIONS && remainingOptions.length > 0;
 
   return (
     <section
