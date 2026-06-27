@@ -7,22 +7,33 @@
  * entities the server echoes back. A genuine chat-vs-form conflict is surfaced as a
  * one-line confirm rather than silently overwriting. Gated by VITE_USE_CONCIERGE.
  */
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { friendlyAdvisorError } from "@/lib/advisor-api";
 import {
   CONCIERGE_MAX_MESSAGE_LENGTH,
+  getConciergeHistory,
   postConciergeChat,
   type ConciergeState,
 } from "@/lib/concierge-api";
 import { useShipmentDraft } from "@/state/ShipmentDraftContext";
-import { conciergeStateToPatch, draftToConciergeState } from "@/state/shipmentDraft";
+import { conciergeStateToPatch, draftToConciergeState, emptyDraft } from "@/state/shipmentDraft";
+
+/** localStorage key holding the anonymous concierge session id (for reload recall). */
+const SESSION_KEY = "ss_concierge_session";
 
 interface Turn {
   id: number;
   question: string;
   reply: string;
+  dispatched?: string | null;
 }
+
+/** A friendly tag for where a turn was handled (only the "rich" workers are shown). */
+const DISPATCH_LABEL: Record<string, string> = {
+  workflow: "✦ full shipment workflow",
+  compliance: "✦ compliance check",
+};
 
 const FIELD_LABEL: Record<string, string> = {
   origin: "origin",
@@ -44,7 +55,45 @@ export default function ConciergePanel() {
   const [convState, setConvState] = useState<ConciergeState | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(
+    () => (typeof localStorage !== "undefined" ? localStorage.getItem(SESSION_KEY) : null),
+  );
   const seq = useRef(0);
+  const recalled = useRef(false);
+
+  // Recall a prior conversation after a page reload (best-effort): replay the
+  // transcript and hydrate the shared draft from the persisted merged state.
+  useEffect(() => {
+    if (recalled.current || !sessionId) return;
+    recalled.current = true;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const hist = await getConciergeHistory(sessionId);
+        if (cancelled) return;
+        const turns: Turn[] = [];
+        let question: string | null = null;
+        for (const m of hist.messages) {
+          if (m.role === "user") question = m.content;
+          else if (m.role === "assistant") {
+            turns.push({ id: seq.current++, question: question ?? "", reply: m.content });
+            question = null;
+          }
+        }
+        setThread(turns);
+        setConvState(hist.state);
+        const patch = conciergeStateToPatch(hist.state, emptyDraft());
+        if (Object.keys(patch).length > 0) applyPatch(patch, "hydrated");
+      } catch {
+        // Unknown / expired session — start fresh.
+        if (typeof localStorage !== "undefined") localStorage.removeItem(SESSION_KEY);
+        setSessionId(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, applyPatch]);
 
   const trimmed = input.trim();
   const overLimit = input.length > CONCIERGE_MAX_MESSAGE_LENGTH;
@@ -55,8 +104,22 @@ export default function ConciergePanel() {
     setPending(true);
     setError(null);
     try {
-      const resp = await postConciergeChat(trimmed, draftToConciergeState(draft, convState));
-      setThread((prev) => [...prev, { id: seq.current++, question: trimmed, reply: resp.reply }]);
+      const resp = await postConciergeChat(
+        trimmed, draftToConciergeState(draft, convState), sessionId,
+      );
+      if (resp.session_id && resp.session_id !== sessionId) {
+        setSessionId(resp.session_id);
+        if (typeof localStorage !== "undefined") {
+          localStorage.setItem(SESSION_KEY, resp.session_id);
+        }
+      }
+      setThread((prev) => [
+        ...prev,
+        {
+          id: seq.current++, question: trimmed,
+          reply: resp.reply, dispatched: resp.dispatched_to,
+        },
+      ]);
       setConvState(resp.state);
       const patch = conciergeStateToPatch(resp.state, draft);
       if (Object.keys(patch).length > 0) applyPatch(patch, "chat");
@@ -79,6 +142,9 @@ export default function ConciergePanel() {
     setConvState(null);
     setInput("");
     setError(null);
+    setSessionId(null);
+    recalled.current = true; // a fresh, intentional session — don't re-recall the old one
+    if (typeof localStorage !== "undefined") localStorage.removeItem(SESSION_KEY);
   };
 
   return (
@@ -106,6 +172,11 @@ export default function ConciergePanel() {
           <div key={t.id} style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", marginBottom: 6 }}>{t.question}</div>
             <div style={{ fontSize: 13, color: "#374151", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{t.reply}</div>
+            {t.dispatched && DISPATCH_LABEL[t.dispatched] && (
+              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+                {DISPATCH_LABEL[t.dispatched]}
+              </div>
+            )}
           </div>
         ))}
 
