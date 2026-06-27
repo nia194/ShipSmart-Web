@@ -24,17 +24,24 @@ function Harness() {
     setWeightLbs: setWeight,
   });
 
-  const { draft, applyPatch } = useShipmentDraft();
+  const { draft, applyPatch, conflicts } = useShipmentDraft();
   return (
     <div>
       <span data-testid="form-origin">{origin}</span>
       <span data-testid="form-weight">{weight}</span>
       <span data-testid="draft-dest">{(draft.destination?.value as string) ?? ""}</span>
+      <span data-testid="conflict-count">{conflicts.length}</span>
+      <button type="button" onClick={() => setOrigin("Boston, MA")}>
+        type-origin
+      </button>
       <button type="button" onClick={() => setDest("Seattle, WA")}>
         type-dest
       </button>
       <button type="button" onClick={() => applyPatch({ origin: "Atlanta, GA", weightLbs: 12 }, "chat")}>
         chat-fill
+      </button>
+      <button type="button" onClick={() => applyPatch({ origin: "Atlanta, GA" }, "chat")}>
+        chat-origin
       </button>
     </div>
   );
@@ -63,5 +70,18 @@ describe("useShipmentDraftFormSync", () => {
     await waitFor(() =>
       expect(screen.getByTestId("draft-dest").textContent).toBe("Seattle, WA"),
     );
+  });
+
+  it("keeps a manually-typed value over a conflicting chat suggestion (form wins)", async () => {
+    renderHarness();
+    fireEvent.click(screen.getByText("type-origin")); // user types Boston, MA
+    await waitFor(() => expect(screen.getByTestId("form-origin").textContent).toBe("Boston, MA"));
+
+    fireEvent.click(screen.getByText("chat-origin")); // chat suggests a different Atlanta, GA
+    await waitFor(() =>
+      expect(Number(screen.getByTestId("conflict-count").textContent)).toBeGreaterThan(0),
+    );
+    // the typed value is preserved (not silently overwritten); the conflict is recorded
+    expect(screen.getByTestId("form-origin").textContent).toBe("Boston, MA");
   });
 });
