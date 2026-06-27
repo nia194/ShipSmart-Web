@@ -31,6 +31,18 @@ export interface DecisionPath {
   tags: string[];
 }
 
+/** One chat message referenced by a reply (the replied-to message, or a recent turn). */
+export interface ReplyMessage {
+  role: "user" | "assistant";
+  text: string;
+}
+
+/** Optional reply-to context for a follow-up question (WhatsApp-style reply). */
+export interface ReplyContext {
+  reply_to?: ReplyMessage;
+  recent_history?: ReplyMessage[];
+}
+
 /** Context forwarded to the advisor. Only keys the backend recognizes. */
 export interface AdvisorContext {
   origin_zip?: string;
@@ -81,10 +93,16 @@ export interface ShipmentSummary {
 export function postShippingAdvice(
   query: string,
   context: AdvisorContext,
+  reply?: ReplyContext,
 ): Promise<ShippingAdvisorResponse> {
   return http<ShippingAdvisorResponse>(pythonApi.advisorShipping(), {
     method: "POST",
-    body: JSON.stringify({ query, context }),
+    body: JSON.stringify({
+      query,
+      context,
+      reply_to: reply?.reply_to ?? null,
+      recent_history: reply?.recent_history ?? null,
+    }),
   });
 }
 
