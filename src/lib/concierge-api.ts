@@ -9,7 +9,7 @@
  * wrapper (correlation IDs + JWT + RFC-7807 parsing).
  */
 import { pythonApi } from "@/config/api";
-import type { AdvisorSource } from "@/lib/advisor-api";
+import type { AdvisorSource, ReplyContext } from "@/lib/advisor-api";
 import { http } from "@/lib/http";
 
 export interface ConciergeState {
@@ -50,10 +50,17 @@ export function postConciergeChat(
   message: string,
   state: ConciergeState | null,
   sessionId?: string | null,
+  reply?: ReplyContext,
 ): Promise<ConciergeResponse> {
   return http<ConciergeResponse>(pythonApi.conciergeChat(), {
     method: "POST",
-    body: JSON.stringify({ message, state, session_id: sessionId ?? null }),
+    body: JSON.stringify({
+      message,
+      state,
+      session_id: sessionId ?? null,
+      reply_to: reply?.reply_to ?? null,
+      recent_history: reply?.recent_history ?? null,
+    }),
   });
 }
 

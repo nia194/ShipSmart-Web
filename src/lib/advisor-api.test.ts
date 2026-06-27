@@ -1,12 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   ADVISOR_MAX_QUESTION_LENGTH,
   friendlyAdvisorError,
+  postShippingAdvice,
   shipmentToContext,
   type ShipmentSummary,
 } from "@/lib/advisor-api";
-import { HttpError } from "@/lib/http";
+import { http, HttpError } from "@/lib/http";
+
+vi.mock("@/lib/http", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/http")>();
+  return { ...actual, http: vi.fn() };
+});
 
 describe("friendlyAdvisorError", () => {
   it.each([
@@ -60,5 +66,38 @@ describe("shipmentToContext", () => {
 describe("ADVISOR_MAX_QUESTION_LENGTH", () => {
   it("mirrors the server-side advisor input cap", () => {
     expect(ADVISOR_MAX_QUESTION_LENGTH).toBe(2000);
+  });
+});
+
+describe("postShippingAdvice reply context", () => {
+  beforeEach(() => {
+    vi.mocked(http).mockReset().mockResolvedValue({} as never);
+  });
+
+  const lastBody = () =>
+    JSON.parse((vi.mocked(http).mock.calls.at(-1)?.[1] as { body: string }).body);
+
+  it("includes reply_to + recent_history when replying to a message", async () => {
+    await postShippingAdvice(
+      "why not the cheaper one?",
+      { origin_zip: "10001" },
+      {
+        reply_to: { role: "assistant", text: "FedEx fastest, LuggageToShip cheapest" },
+        recent_history: [{ role: "user", text: "options?" }],
+      },
+    );
+    const body = lastBody();
+    expect(body.reply_to).toEqual({
+      role: "assistant",
+      text: "FedEx fastest, LuggageToShip cheapest",
+    });
+    expect(body.recent_history).toEqual([{ role: "user", text: "options?" }]);
+  });
+
+  it("sends null reply fields for a normal (non-reply) question — back-compat", async () => {
+    await postShippingAdvice("what carriers are available?", {});
+    const body = lastBody();
+    expect(body.reply_to).toBeNull();
+    expect(body.recent_history).toBeNull();
   });
 });
