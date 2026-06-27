@@ -35,3 +35,7 @@ services:
         value: "true"
       - key: VITE_USE_JAVA_BOOKING_REDIRECT
         value: "true"
+      # Conversational concierge on the homepage. ON by default (opt-out);
+      # set "false" to hide it. Requires CONCIERGE_ENABLED=true on the API.
+      - key: VITE_USE_CONCIERGE
+        value: "true"
