@@ -32,6 +32,10 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import FloatingShipmentAdvisor from "@/components/advisor/FloatingShipmentAdvisor";
+import ConciergePanel from "@/components/advisor/ConciergePanel";
+import { apiConfig } from "@/config/api";
+import { ShipmentDraftProvider } from "@/state/ShipmentDraftContext";
+import { useShipmentDraftFormSync } from "@/state/useShipmentDraftFormSync";
 import birdPackageVideo from "@/videos/bird-package.mp4";
 import labelPrinterVideo from "@/videos/label-printer.mp4";
 
@@ -246,7 +250,7 @@ function serviceToCompareOption(svc: ShippingService): CompareOption {
   };
 }
 
-export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
+function HomePageInner({ savedIds, onSaveService }: HomePageProps) {
   const { user } = useAuth();
 
   const [origin, setOrigin] = useState("");
@@ -293,6 +297,22 @@ export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
     useState<ShippingService | null>(null);
 
   const { loading, data, fetchQuotes } = useShippingQuotes();
+
+  // Keep the form and the shared ShipmentDraft in sync so the concierge can pre-fill
+  // the form (and not re-ask for what's already typed). No-op unless the concierge is on.
+  useShipmentDraftFormSync({
+    origin,
+    setOrigin,
+    destination: dest,
+    setDestination: setDest,
+    dropDate,
+    setDropDate,
+    deliveryDate: delivDate,
+    setDeliveryDate: setDelivDate,
+    weightLbs: packages[0]?.weight ?? "",
+    setWeightLbs: (v) =>
+      setPackages((prev) => (prev.length ? [{ ...prev[0], weight: v }, ...prev.slice(1)] : prev)),
+  });
   const res = useRef<HTMLDivElement>(null);
   const destRef = useRef<HTMLInputElement>(null);
 
@@ -743,6 +763,8 @@ export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
           padding: "0 16px",
         }}
       >
+        {apiConfig.useConcierge && <ConciergePanel />}
+
         {/* LOCATION */}
         <div
           className="ss-card"
@@ -1754,7 +1776,15 @@ export default function HomePage({ savedIds, onSaveService }: HomePageProps) {
       </div>
         </section>
 
-      
+
     </div>
+  );
+}
+
+export default function HomePage(props: HomePageProps) {
+  return (
+    <ShipmentDraftProvider>
+      <HomePageInner {...props} />
+    </ShipmentDraftProvider>
   );
 }
