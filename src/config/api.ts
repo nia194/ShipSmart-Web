@@ -87,4 +87,7 @@ export const pythonApi = {
   workflowReview: (id: string) => `${apiConfig.pythonApiBaseUrl}/api/v1/workflow/${id}/review`,
   /** Conversational Concierge — stateful slot-filling chat. */
   conciergeChat: () => `${apiConfig.pythonApiBaseUrl}/api/v1/concierge/chat`,
+  /** Persisted conversation for recall after a page reload (server memory). */
+  conciergeHistory: (sessionId: string) =>
+    `${apiConfig.pythonApiBaseUrl}/api/v1/concierge/${sessionId}`,
 } as const;
