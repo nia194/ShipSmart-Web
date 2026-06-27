@@ -13,6 +13,7 @@ import {
   type AdvisorContext,
   type AdvisorSource,
   type DecisionPath,
+  type ReplyContext,
   friendlyAdvisorError,
   postShippingAdvice,
 } from "@/lib/advisor-api";
@@ -28,7 +29,28 @@ type ChatMessage = {
   sources?: AdvisorSource[];
   decisionPath?: DecisionPath | null;
   question?: string;
+  // Set on a user turn that replied to an earlier message (for the subtle indicator).
+  replyTo?: { role: "user" | "assistant"; snippet: string };
 };
+
+const REPLY_SNIPPET_MAX = 90;
+
+function replySnippet(text: string): string {
+  const t = text.replace(/\s+/g, " ").trim();
+  return t.length > REPLY_SNIPPET_MAX ? `${t.slice(0, REPLY_SNIPPET_MAX - 1)}…` : t;
+}
+
+function ReplyButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-[11px] font-semibold text-slate-400 transition hover:text-blue-600"
+    >
+      ↩ Reply
+    </button>
+  );
+}
 
 type ParsedSection = {
   label: string;
@@ -1348,6 +1370,7 @@ export default function FloatingShipmentAdvisor({
   const [internalOpen, setInternalOpen] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [replyTarget, setReplyTarget] = useState<ChatMessage | null>(null);
 
   const open = controlledOpen ?? internalOpen;
   const setOpen = (nextOpen: boolean) => {
@@ -1373,11 +1396,11 @@ export default function FloatingShipmentAdvisor({
   );
 
   const ask = useMutation({
-    mutationFn: async (question: string) => {
+    mutationFn: async ({ question, reply }: { question: string; reply?: ReplyContext }) => {
       const enrichedQuestion = `${optionsContext}\n\nUser question:\n${question}`;
-      return postShippingAdvice(enrichedQuestion, context);
+      return postShippingAdvice(enrichedQuestion, context, reply);
     },
-    onSuccess: (response, question) => {
+    onSuccess: (response, { question }) => {
       setMessages((prev) => [
         ...prev,
         {
@@ -1410,6 +1433,15 @@ export default function FloatingShipmentAdvisor({
 
     if (clean.length < 3 || ask.isPending) return;
 
+    // Capture the reply target (if any) + a bounded recent history BEFORE this turn.
+    const target = replyTarget;
+    const reply: ReplyContext | undefined = target
+      ? {
+          reply_to: { role: target.role, text: target.content },
+          recent_history: messages.slice(-6).map((m) => ({ role: m.role, text: m.content })),
+        }
+      : undefined;
+
     const localAnswer = tryBuildLocalAnswer(clean, safeOptions, selectedPriority);
 
     setMessages((prev) => {
@@ -1419,6 +1451,9 @@ export default function FloatingShipmentAdvisor({
           id: makeId(),
           role: "user",
           content: clean,
+          replyTo: target
+            ? { role: target.role, snippet: replySnippet(target.content) }
+            : undefined,
         },
       ];
 
@@ -1437,12 +1472,14 @@ export default function FloatingShipmentAdvisor({
       ];
     });
 
+    setReplyTarget(null); // a reply is consumed once sent
+
     if (localAnswer) {
       setInput("");
       return;
     }
 
-    ask.mutate(clean);
+    ask.mutate({ question: clean, reply });
   };
 
   const handleSubmit = (event: FormEvent) => {
@@ -1621,13 +1658,19 @@ export default function FloatingShipmentAdvisor({
               {messages.map((message) => {
                 if (message.role === "user") {
                   return (
-                    <div
-                      key={message.id}
-                      className="ml-auto max-w-[82%] rounded-2xl rounded-tr-md bg-blue-600 px-3.5 py-2.5 text-sm font-medium text-white shadow-sm"
-                    >
-                      <div className="whitespace-pre-wrap leading-relaxed">
-                        {message.content}
+                    <div key={message.id} className="ml-auto flex max-w-[82%] flex-col items-end gap-1">
+                      {message.replyTo && (
+                        <div className="max-w-full truncate rounded-md bg-blue-50 px-2 py-0.5 text-[11px] text-blue-700">
+                          ↩ replying to {message.replyTo.role === "assistant" ? "advisor" : "you"}:{" "}
+                          {message.replyTo.snippet}
+                        </div>
+                      )}
+                      <div className="rounded-2xl rounded-tr-md bg-blue-600 px-3.5 py-2.5 text-sm font-medium text-white shadow-sm">
+                        <div className="whitespace-pre-wrap leading-relaxed">
+                          {message.content}
+                        </div>
                       </div>
+                      <ReplyButton onClick={() => setReplyTarget(message)} />
                     </div>
                   );
                 }
@@ -1636,13 +1679,16 @@ export default function FloatingShipmentAdvisor({
                   <div key={message.id} className="flex items-start gap-2">
                     <BotAvatar />
 
-                    <div className="mr-auto max-w-[84%] rounded-2xl rounded-tl-md bg-slate-50 px-3.5 py-3 text-sm text-slate-800">
-                      <AssistantAnswer
-                        text={message.content}
-                        options={safeOptions}
-                        question={message.question}
-                      />
-                      <SourceDisclosure sources={message.sources} />
+                    <div className="mr-auto flex max-w-[84%] flex-col items-start gap-1">
+                      <div className="rounded-2xl rounded-tl-md bg-slate-50 px-3.5 py-3 text-sm text-slate-800">
+                        <AssistantAnswer
+                          text={message.content}
+                          options={safeOptions}
+                          question={message.question}
+                        />
+                        <SourceDisclosure sources={message.sources} />
+                      </div>
+                      <ReplyButton onClick={() => setReplyTarget(message)} />
                     </div>
                   </div>
                 );
@@ -1676,6 +1722,25 @@ export default function FloatingShipmentAdvisor({
             </div>
 
             <form onSubmit={handleSubmit} className="border-t border-slate-100 p-3">
+              {replyTarget && (
+                <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5">
+                  <div className="min-w-0 text-xs text-slate-600">
+                    <span className="font-semibold text-slate-500">
+                      Replying to {replyTarget.role === "assistant" ? "advisor" : "you"}:
+                    </span>{" "}
+                    <span className="text-slate-500">{replySnippet(replyTarget.content)}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setReplyTarget(null)}
+                    aria-label="Cancel reply"
+                    className="shrink-0 text-lg leading-none text-slate-400 transition hover:text-slate-700"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+
               <div className="flex items-end gap-2">
                 <textarea
                   value={input}

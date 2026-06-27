@@ -58,6 +58,7 @@ export default function ConciergePanel() {
   const [sessionId, setSessionId] = useState<string | null>(
     () => (typeof localStorage !== "undefined" ? localStorage.getItem(SESSION_KEY) : null),
   );
+  const [replyTarget, setReplyTarget] = useState<{ role: "assistant"; text: string } | null>(null);
   const seq = useRef(0);
   const recalled = useRef(false);
 
@@ -103,9 +104,22 @@ export default function ConciergePanel() {
     if (!canSend) return;
     setPending(true);
     setError(null);
+    const target = replyTarget;
+    const reply = target
+      ? {
+          reply_to: { role: target.role, text: target.text },
+          recent_history: thread
+            .flatMap((t) => [
+              { role: "user" as const, text: t.question },
+              { role: "assistant" as const, text: t.reply },
+            ])
+            .slice(-6),
+        }
+      : undefined;
+    setReplyTarget(null);
     try {
       const resp = await postConciergeChat(
-        trimmed, draftToConciergeState(draft, convState), sessionId,
+        trimmed, draftToConciergeState(draft, convState), sessionId, reply,
       );
       if (resp.session_id && resp.session_id !== sessionId) {
         setSessionId(resp.session_id);
@@ -143,6 +157,7 @@ export default function ConciergePanel() {
     setInput("");
     setError(null);
     setSessionId(null);
+    setReplyTarget(null);
     recalled.current = true; // a fresh, intentional session — don't re-recall the old one
     if (typeof localStorage !== "undefined") localStorage.removeItem(SESSION_KEY);
   };
@@ -177,6 +192,13 @@ export default function ConciergePanel() {
                 {DISPATCH_LABEL[t.dispatched]}
               </div>
             )}
+            <button
+              type="button"
+              onClick={() => setReplyTarget({ role: "assistant", text: t.reply })}
+              style={{ marginTop: 4, fontSize: 11, fontWeight: 600, color: "#9ca3af", background: "none", border: "none", padding: 0, cursor: "pointer" }}
+            >
+              ↩ Reply
+            </button>
           </div>
         ))}
 
@@ -212,6 +234,21 @@ export default function ConciergePanel() {
       </div>
 
       <form onSubmit={handleSubmit} style={{ padding: "12px 16px", borderTop: "1px solid #eef0f2" }}>
+        {replyTarget && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8, padding: "6px 10px", borderRadius: 8, background: "#f3f4f6", border: "1px solid #e5e7eb" }}>
+            <span style={{ fontSize: 12, color: "#6b7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {"↩ Replying to advisor: "}{replyTarget.text.slice(0, 80)}
+            </span>
+            <button
+              type="button"
+              onClick={() => setReplyTarget(null)}
+              aria-label="Cancel reply"
+              style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: 16, lineHeight: 1 }}
+            >
+              ×
+            </button>
+          </div>
+        )}
         <label htmlFor="concierge-input" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>
           Message the concierge
         </label>
