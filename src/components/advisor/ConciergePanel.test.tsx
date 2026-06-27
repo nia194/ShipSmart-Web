@@ -105,4 +105,16 @@ describe("ConciergePanel", () => {
     expect(await screen.findByText("ship Atlanta to Seattle")).toBeTruthy();
     await waitFor(() => expect(screen.getByTestId("origin").textContent).toBe("Atlanta, GA"));
   });
+
+  it("offers reply on a turn and shows (then cancels) the replying-to preview", async () => {
+    vi.spyOn(conciergeApi, "postConciergeChat").mockResolvedValue(reply({}));
+    renderPanel();
+    await send("ship from Atlanta to Seattle");
+
+    fireEvent.click(await screen.findByRole("button", { name: "↩ Reply" }));
+    expect(await screen.findByText(/Replying to advisor/i)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /cancel reply/i }));
+    await waitFor(() => expect(screen.queryByText(/Replying to advisor/i)).toBeNull());
+  });
 });
