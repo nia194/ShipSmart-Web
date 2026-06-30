@@ -239,6 +239,13 @@ Vitest + `@testing-library/react` (jsdom), under `src/`:
 
 The TS response interfaces in `src/lib/advisor-api.ts`, `src/lib/workflow-api.ts`, and `src/components/shipping/compare.types.ts` are also asserted against the backend schemas from `ShipSmart-Test/contract/`.
 
+### Continuous integration
+
+`.github/workflows/ci.yml` gates every push / PR with the same scripts, in order:
+**eslint** (`pnpm lint`) → **type-check** (`pnpm typecheck`) → **Vitest** (`pnpm test`) →
+**production build** (`pnpm build`). It runs on Node 20 with a dummy Supabase env, so the
+build and tests pass without any real secrets.
+
 ---
 
 ## Deployment (Render)
