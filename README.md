@@ -177,8 +177,14 @@ VITE_USE_JAVA_BOOKING_REDIRECT=true
 # Multi-agent workflow page (UC3/UC4) — off by default (route + nav hidden).
 VITE_USE_WORKFLOW=false
 
-# Conversational Concierge chat on the home page — off by default (panel hidden).
-VITE_USE_CONCIERGE=false
+# Conversational Concierge chat on the home page — ON by default; set "false" to hide it.
+VITE_USE_CONCIERGE=true
+
+# Shipping scope (mirrors the API's SHIPPING_SCOPE). worldwide (default) = cross-border
+# allowed; domestic = deliveries within VITE_DOMESTIC_COUNTRY only (the form hides the
+# country fields and the result hides duties).
+VITE_SHIPPING_SCOPE=worldwide
+VITE_DOMESTIC_COUNTRY=US
 ```
 
 Without `VITE_SUPABASE_ANON_KEY` the Supabase client cannot initialize
@@ -209,7 +215,7 @@ their deployed equivalents.
 | `pnpm preview` | Serve the built `dist/` locally to smoke-test the production bundle. |
 | `pnpm typecheck` | `tsc -b --noEmit` — catch type errors without emitting JS. |
 | `pnpm lint` | ESLint across the repo. |
-| `pnpm test` | Vitest one-shot run (53 tests, jsdom). |
+| `pnpm test` | Vitest one-shot run (63 tests across 14 files, jsdom). |
 | `pnpm test:watch` | Vitest in watch mode. |
 
 ### Tests
@@ -227,6 +233,9 @@ Vitest + `@testing-library/react` (jsdom), under `src/`:
 | `components/workflow/WorkflowPage.test.tsx` | Submit → suspended (`awaiting_review`) result + review panel → clear → completed. |
 | `state/shipmentDraft.test.ts` | The shared-draft merge rules (conflict/provenance) + the concierge adapters (diff-only back-channel). |
 | `components/advisor/ConciergePanel.test.tsx` | Chat → reply, the back-channel patch fills the form, and the chat-vs-form conflict confirm. |
+| `components/advisor/FloatingShipmentAdvisor.test.tsx` | The floating advisor launcher: open/close, shipment-context wiring, and panel switching. |
+| `components/workflow/WorkflowForm.test.tsx` | Workflow request form validation + submit payload shape. |
+| `state/useShipmentDraftFormSync.test.tsx` | The form ⇄ draft binding hook: form edits write through, chat patches reflect back without clobbering. |
 
 The TS response interfaces in `src/lib/advisor-api.ts`, `src/lib/workflow-api.ts`, and `src/components/shipping/compare.types.ts` are also asserted against the backend schemas from `ShipSmart-Test/contract/`.
 
@@ -308,8 +317,8 @@ lockstep:
 The shipment **form** and a conversational **concierge chat** are two views over **one
 shared shipment draft**: type "Atlanta → Seattle, 12 lb" in the chat and the route /
 weight fields fill in; fill the form and the chat already knows and won't re-ask. Gated by
-`VITE_USE_CONCIERGE` (off by default → the panel is hidden and the form behaves exactly as
-before). The **bulk of this feature lives in this repo.**
+`VITE_USE_CONCIERGE` (**on by default**; set to `false` to hide the panel so the form behaves
+exactly as before). The **bulk of this feature lives in this repo.**
 
 How it works:
 
@@ -335,8 +344,8 @@ How it works:
   resets both the draft and the chat thread.
 
 Backed by the **Conversational Concierge** chat endpoint (`POST /api/v1/concierge/chat`, a
-slot-filling `ConversationState`) in ShipSmart-API. **Backward-compatible and off by
-default** — with the chat hidden, the form behaves exactly as it does today.
+slot-filling `ConversationState`) in ShipSmart-API. **Backward-compatible** — set
+`VITE_USE_CONCIERGE=false` and, with the chat hidden, the form behaves exactly as it does today.
 
 ---
 
