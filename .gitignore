@@ -50,3 +50,7 @@ logs/
 .DS_Store
 Thumbs.db
 
+# ─── Playwright (browser e2e) artifacts ───────────────────────────────────────
+/playwright-report/
+/test-results/
+

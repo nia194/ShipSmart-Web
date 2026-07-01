@@ -216,6 +216,7 @@ their deployed equivalents.
 | `pnpm typecheck` | `tsc -b --noEmit` — catch type errors without emitting JS. |
 | `pnpm lint` | ESLint across the repo. |
 | `pnpm test` | Vitest one-shot run (63 tests across 14 files, jsdom). |
+| `pnpm test:e2e` | Playwright browser smoke (`e2e-web/`) against a live dev server — the real web-flow. |
 | `pnpm test:watch` | Vitest in watch mode. |
 
 ### Tests
