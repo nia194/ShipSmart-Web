@@ -50,5 +50,8 @@ export default defineConfig(({ mode }) => ({
       environment: "jsdom",
       setupFiles: ["./src/test/setup.ts"],
       css: false,
+      // Keep Vitest scoped to unit/component tests under src/ so it never picks up
+      // the Playwright browser specs in e2e-web/ (which import @playwright/test).
+      include: ["src/**/*.{test,spec}.{ts,tsx}"],
     },
   }));
