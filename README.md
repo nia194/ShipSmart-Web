@@ -34,7 +34,7 @@ and the Python AI/orchestration API
 
 ## The ShipSmart ecosystem
 
-This frontend is one of five sibling repositories. Clone them as
+This frontend is one of six sibling repositories. Clone them as
 siblings of this directory when working on the full system.
 
 | Repo | Role | Stack |
@@ -44,6 +44,7 @@ siblings of this directory when working on the full system.
 | [ShipSmart-API](https://github.com/nia194/ShipSmart-API) | Python AI/orchestration service — RAG, advisors, recommendations, compliance (UC2), multi-agent workflow (UC3/UC4) | FastAPI, Python 3.13 |
 | [ShipSmart-MCP](https://github.com/nia194/ShipSmart-MCP) | MCP tool server — `validate_address`, `get_quote_preview` (provider-pluggable) | FastAPI + MCP |
 | [ShipSmart-Infra](https://github.com/nia194/ShipSmart-Infra) | Supabase migrations + edge functions, deployment configs, docs | Supabase, Render blueprints |
+| [ShipSmart-Test](https://github.com/nia194/ShipSmart-Test) | Cross-repo integration harness — contract + live e2e suites, cross-service Postman collection | Python 3.13, pytest |
 
 ```
                 ┌───────────────────────────────────────────────────┐
