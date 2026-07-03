@@ -126,8 +126,7 @@ src/
 ├── hooks/                         TanStack Query / data hooks
 │   ├── useShippingQuotes.ts       Java /quotes (or Supabase edge fn fallback)
 │   ├── useSavedOptions.ts         Java /saved-options (or Supabase edge fn fallback)
-│   ├── use-toast.ts               Radix toast state
-│   └── use-mobile.tsx             Viewport breakpoint hook
+│   └── use-toast.ts               Radix toast state
 └── styles/                        Global stylesheet (shipsmart.css)
 ```
 
@@ -168,7 +167,6 @@ VITE_SUPABASE_URL=https://<project>.supabase.co
 VITE_SUPABASE_ANON_KEY=<anon key — Settings → API in Supabase>
 VITE_JAVA_API_BASE_URL=http://localhost:8080
 VITE_PYTHON_API_BASE_URL=http://localhost:8000
-VITE_APP_ENV=development
 
 # Feature flags — set to "false" to fall back to Supabase edge functions.
 VITE_USE_JAVA_QUOTES=true
@@ -229,7 +227,6 @@ Vitest + `@testing-library/react` (jsdom), under `src/`:
 | `lib/advisor-api.test.ts` | The advisor error taxonomy → friendly copy, `shipmentToContext` mapping, input cap. |
 | `lib/http.test.ts` | The shared fetch wrapper: correlation headers, bearer JWT, idempotency key, RFC-7807 `HttpError`, 204. |
 | `hooks/useShippingQuotes.test.ts` / `hooks/useSavedOptions.test.ts` | The Java-vs-Supabase backend toggle and signed-in/out state. |
-| `components/advisor/AdvisorPanel.test.tsx` | Provenance badges, citations, graceful error states, client validation. |
 | `components/shipping/CompareSection.test.tsx` | Loading state + comparison grid render from a fixture. |
 | `lib/workflow-api.test.ts` | Workflow error taxonomy → friendly copy, advisory `verdictLabel` mapping, input cap. |
 | `components/workflow/WorkflowPage.test.tsx` | Submit → suspended (`awaiting_review`) result + review panel → clear → completed. |
