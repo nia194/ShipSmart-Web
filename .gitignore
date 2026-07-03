@@ -50,9 +50,6 @@ logs/
 .DS_Store
 Thumbs.db
 
-# ─── Claude / AI tooling (local only, never commit) ───────────────────────────
-.claude/
-
 # ─── Playwright (browser e2e) artifacts ───────────────────────────────────────
 /playwright-report/
 /test-results/
