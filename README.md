@@ -36,6 +36,9 @@ and the Python AI/orchestration API
 
 This frontend is one of six sibling repositories. Clone them as
 siblings of this directory when working on the full system.
+All six are also mirrored together in
+**[ShipSmart](https://github.com/nia194/ShipSmart)** — the umbrella
+repository that snapshots each component at its latest stable milestone.
 
 | Repo | Role | Stack |
 |---|---|---|
