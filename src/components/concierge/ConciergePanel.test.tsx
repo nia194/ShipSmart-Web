@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import ConciergePanel from "@/components/advisor/ConciergePanel";
+import ConciergePanel from "@/components/concierge/ConciergePanel";
 import * as conciergeApi from "@/lib/concierge-api";
 import type { ConciergeResponse } from "@/lib/concierge-api";
 import { ShipmentDraftProvider, useShipmentDraft } from "@/state/ShipmentDraftContext";

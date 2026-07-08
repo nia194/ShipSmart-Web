@@ -5,7 +5,7 @@ import type { Priority } from "@/components/shipping/compare.types";
 import type { ShippingService } from "@/lib/shipping-data";
 import { supabase } from "@/integrations/supabase/client";
 import { apiConfig, javaApi } from "@/config/api";
-import FloatingShipmentAdvisor from "@/components/advisor/FloatingShipmentAdvisor";
+import FloatingShipmentAdvisor from "@/components/concierge/FloatingShipmentAdvisor";
 import {
   formatMoney,
   isMajorCarrier,

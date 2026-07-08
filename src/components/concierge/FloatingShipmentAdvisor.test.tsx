@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import FloatingShipmentAdvisor from "@/components/advisor/FloatingShipmentAdvisor";
+import FloatingShipmentAdvisor from "@/components/concierge/FloatingShipmentAdvisor";
 import type { CompareOption } from "@/components/shipping/compare.types";
 import * as advisorApi from "@/lib/advisor-api";
 
