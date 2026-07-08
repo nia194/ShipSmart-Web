@@ -5,7 +5,10 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import type { CompareOption, Priority } from "@/components/shipping/compare.types";
+import type {
+  CompareOption,
+  Priority,
+} from "@/components/shipping/compare.types";
 import { friendlyAdvisorError } from "@/lib/advisor-api";
 import {
   CONCIERGE_MAX_MESSAGE_LENGTH,
@@ -117,6 +120,19 @@ const WEEKDAY_INDEX: Record<string, number> = {
   saturday: 6,
 };
 
+const CITY_ALIASES: Record<string, string> = {
+  atlanta: "Atlanta, GA",
+  seattle: "Seattle, WA",
+  boston: "Boston, MA",
+  "new york": "New York, NY",
+  nyc: "New York, NY",
+  "los angeles": "Los Angeles, CA",
+  la: "Los Angeles, CA",
+  chicago: "Chicago, IL",
+  dallas: "Dallas, TX",
+  miami: "Miami, FL",
+};
+
 function toIsoDate(date: Date) {
   return date.toISOString().slice(0, 10);
 }
@@ -128,8 +144,8 @@ function nextWeekdayIso(dayName: string) {
   const today = new Date();
   const result = new Date(today);
   const current = today.getDay();
-  let diff = target - current;
 
+  let diff = target - current;
   if (diff <= 0) diff += 7;
 
   result.setDate(today.getDate() + diff);
@@ -146,10 +162,20 @@ function tomorrowIso() {
 function cleanupLocation(value: string) {
   return value
     .replace(/\b(package|box|shipment|parcel|luggage)\b/gi, "")
-    .replace(/\bby\s+(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, "")
+    .replace(
+      /\bby\s+(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi,
+      "",
+    )
     .replace(/\b\d+(\.\d+)?\s*(lb|lbs|pounds?)\b/gi, "")
     .replace(/[.;]+$/g, "")
     .trim();
+}
+
+function normalizeLocation(value: string) {
+  const cleaned = cleanupLocation(value);
+  const key = cleaned.toLowerCase().replace(/\s+/g, " ").trim();
+
+  return CITY_ALIASES[key] ?? cleaned;
 }
 
 function parseDateFromText(text: string) {
@@ -158,12 +184,19 @@ function parseDateFromText(text: string) {
   const isoMatch = lower.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
   if (isoMatch?.[1]) return isoMatch[1];
 
-  const slashMatch = lower.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
+  const slashMatch = lower.match(
+    /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/,
+  );
+
   if (slashMatch) {
     const month = Number(slashMatch[1]);
     const day = Number(slashMatch[2]);
     const year = slashMatch[3]
-      ? Number(slashMatch[3].length === 2 ? `20${slashMatch[3]}` : slashMatch[3])
+      ? Number(
+          slashMatch[3].length === 2
+            ? `20${slashMatch[3]}`
+            : slashMatch[3],
+        )
       : new Date().getFullYear();
 
     const date = new Date(year, month - 1, day);
@@ -188,13 +221,17 @@ function parseDateFromText(text: string) {
   return null;
 }
 
-function inferPatchFromMessage(message: string): Partial<Record<ScalarField, unknown>> {
+function inferPatchFromMessage(
+  message: string,
+): Partial<Record<ScalarField, unknown>> {
   const patch: Partial<Record<ScalarField, unknown>> = {};
   const text = message.trim();
 
   const weightMatch = text.match(/\b(\d+(?:\.\d+)?)\s*(?:lb|lbs|pounds?)\b/i);
+
   if (weightMatch?.[1]) {
     const weight = Number(weightMatch[1]);
+
     if (Number.isFinite(weight) && weight > 0) {
       patch.weightLbs = weight;
     }
@@ -206,6 +243,7 @@ function inferPatchFromMessage(message: string): Partial<Record<ScalarField, unk
 
   if (declaredValueMatch?.[1]) {
     const value = Number(declaredValueMatch[1]);
+
     if (Number.isFinite(value) && value > 0) {
       patch.declaredValueUsd = value;
     }
@@ -216,30 +254,38 @@ function inferPatchFromMessage(message: string): Partial<Record<ScalarField, unk
   );
 
   if (routeWithFrom?.[1] && routeWithFrom?.[2]) {
-    const origin = cleanupLocation(routeWithFrom[1]);
-    const destination = cleanupLocation(routeWithFrom[2]);
+    const origin = normalizeLocation(routeWithFrom[1]);
+    const destination = normalizeLocation(routeWithFrom[2]);
 
     if (origin) patch.origin = origin;
     if (destination) patch.destination = destination;
   }
 
   const routeWithoutFrom =
-    !patch.origin &&
-    !patch.destination &&
-    text.match(
-      /^(.+?)\s+(?:to|→)\s+(.+?)(?=\s+(?:by|before|on|for|with|weighing|weight|need|arrive|deliver)\b|[,.;]|$)/i,
-    );
+    patch.origin || patch.destination
+      ? null
+      : text.match(
+          /^(.+?)\s+(?:to|→)\s+(.+?)(?=\s+(?:by|before|on|for|with|weighing|weight|need|arrive|deliver)\b|[,.;]|$)/i,
+        );
 
-  if (routeWithoutFrom?.[1] && routeWithoutFrom?.[2]) {
-    const origin = cleanupLocation(routeWithoutFrom[1]);
-    const destination = cleanupLocation(routeWithoutFrom[2]);
+  if (routeWithoutFrom) {
+    const [, originRaw, destinationRaw] = routeWithoutFrom;
 
-    if (origin) patch.origin = origin;
-    if (destination) patch.destination = destination;
+    if (originRaw && destinationRaw) {
+      const origin = normalizeLocation(originRaw);
+      const destination = normalizeLocation(destinationRaw);
+
+      if (origin) patch.origin = origin;
+      if (destination) patch.destination = destination;
+    }
   }
 
   const deliveryDate = parseDateFromText(text);
-  if (deliveryDate && /\b(by|before|arrive|arrival|deliver|delivery|need)\b/i.test(text)) {
+
+  if (
+    deliveryDate &&
+    /\b(by|before|arrive|arrival|deliver|delivery|need)\b/i.test(text)
+  ) {
     patch.deliveryDate = deliveryDate;
   }
 
@@ -249,7 +295,10 @@ function inferPatchFromMessage(message: string): Partial<Record<ScalarField, unk
 
   if (dropOffMatch?.[1]) {
     const dropOffDate = parseDateFromText(dropOffMatch[1]);
-    if (dropOffDate) patch.dropOffDate = dropOffDate;
+
+    if (dropOffDate) {
+      patch.dropOffDate = dropOffDate;
+    }
   }
 
   if (/\b(cheapest|lowest price|lowest cost|least expensive)\b/i.test(text)) {
@@ -271,7 +320,10 @@ function applyPatchToState(
 ): ConciergeState {
   const slots = { ...(state.slots ?? {}) };
 
-  for (const [field, value] of Object.entries(patch) as [ScalarField, unknown][]) {
+  for (const [field, value] of Object.entries(patch) as [
+    ScalarField,
+    unknown,
+  ][]) {
     const slot = SLOT_BY_FIELD[field];
 
     if (slot && value !== undefined && value !== null && value !== "") {
@@ -355,13 +407,8 @@ export default function ConciergePanel({
   quoteOptions = [],
   selectedPriority,
 }: ConciergePanelProps) {
-  const {
-    draft,
-    applyPatch,
-    conflicts,
-    resolveConflict,
-    reset,
-  } = useShipmentDraft();
+  const { draft, applyPatch, conflicts, resolveConflict, reset } =
+    useShipmentDraft();
 
   const [thread, setThread] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
@@ -762,9 +809,10 @@ export default function ConciergePanel({
             }}
           >
             <div style={{ fontWeight: 800, marginBottom: 8 }}>
-              Your form has {String(conflict.current)} for{" "}
+              I found a possible mismatch. Your form has{" "}
+              {String(conflict.current)} for{" "}
               {FIELD_LABEL[conflict.field] ?? conflict.field}, but chat found{" "}
-              {String(conflict.incoming)}.
+              {String(conflict.incoming)}. Which should I use?
             </div>
 
             <div style={{ display: "flex", gap: 8 }}>
@@ -785,21 +833,21 @@ export default function ConciergePanel({
               </button>
 
               <button
-                type="button"
-                onClick={() => resolveConflict(conflict.field, "incoming")}
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 8,
-                  border: "1px solid #f97316",
-                  background: "#f97316",
-                  color: "#ffffff",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                }}
-              >
-                Use chat value
-              </button>
+  type="button"
+  onClick={() => resolveConflict(conflict.field, "incoming")}
+  style={{
+    padding: "6px 10px",
+    borderRadius: 8,
+    border: "1px solid #f97316",
+    background: "#f97316",
+    color: "#ffffff",
+    fontWeight: 800,
+    cursor: "pointer",
+    fontFamily: "inherit",
+  }}
+>
+  Use {String(conflict.incoming)}
+</button>
             </div>
           </div>
         ))}
@@ -821,7 +869,7 @@ export default function ConciergePanel({
           }}
         >
           <span style={{ flex: 1 }}>
-            Replying to: {replyTarget.text.slice(0, 80)}
+            Replying to advisor: {replyTarget.text.slice(0, 80)}
             {replyTarget.text.length > 80 ? "…" : ""}
           </span>
 
@@ -855,6 +903,7 @@ export default function ConciergePanel({
           </button>
 
           <input
+            aria-label="Message the concierge"
             value={input}
             onChange={(event) => setInput(event.target.value)}
             placeholder="Tell me what you’re shipping..."
@@ -871,7 +920,7 @@ export default function ConciergePanel({
           <button
             type="submit"
             disabled={!canSend}
-            aria-label="Send message"
+            aria-label="Send"
             className="ss-concierge-send"
           >
             ↗

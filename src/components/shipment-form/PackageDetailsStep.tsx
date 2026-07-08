@@ -4,7 +4,6 @@ import type { PackageItem } from "@/lib/shipping-data";
 
 import PackageCard, {
   getPackageTypeLabel,
-  isPackageComplete,
 } from "@/components/shipment-form/PackageCard";
 
 interface PackageDetailsStepProps {

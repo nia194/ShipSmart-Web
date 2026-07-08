@@ -1,5 +1,3 @@
-// src/state/useShipmentDraftFormSync.ts
-
 import { useEffect, useRef } from "react";
 import { useShipmentDraft } from "@/state/ShipmentDraftContext";
 import type { PackageItem } from "@/lib/shipping-data";
@@ -59,8 +57,52 @@ function shouldApplyDraftValue(source: unknown) {
   return source === "chat" || source === "hydrated";
 }
 
+function shouldApplyTextValue(source: unknown, nextValue: string, currentValue: string) {
+  if (!shouldApplyDraftValue(source)) return false;
+  if (!nextValue) return false;
+  if (nextValue === currentValue) return false;
+
+  // Do not let chat silently overwrite what the user already typed.
+  return isEmpty(currentValue);
+}
+
+function shouldApplyDateValue(
+  source: unknown,
+  nextValue: DateValue,
+  currentValue: DateValue,
+) {
+  if (!shouldApplyDraftValue(source)) return false;
+  if (!nextValue) return false;
+  if (datesSame(nextValue, currentValue)) return false;
+
+  // Do not let chat silently overwrite a manually selected date.
+  return !currentValue;
+}
+
+function isPackageFieldEmpty(value: unknown) {
+  return value === undefined || value === null || String(value).trim() === "";
+}
+
+function isPackageEffectivelyEmpty(pkg: PackageItem) {
+  return (
+    isPackageFieldEmpty(pkg.weight) &&
+    isPackageFieldEmpty(pkg.l) &&
+    isPackageFieldEmpty(pkg.w) &&
+    isPackageFieldEmpty(pkg.h)
+  );
+}
+
+function packagesAreEffectivelyEmpty(packages?: PackageItem[]) {
+  if (!packages?.length) return true;
+  return packages.every(isPackageEffectivelyEmpty);
+}
+
 function itemsSame(a?: PackageItem[], b?: PackageItem[]) {
   return JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
+}
+
+function clonePackages(items: PackageItem[]) {
+  return items.map((item) => ({ ...item }));
 }
 
 export function useShipmentDraftFormSync({
@@ -121,9 +163,11 @@ export function useShipmentDraftFormSync({
     const nextOrigin = asString(draft.origin?.value);
 
     if (
-      shouldApplyDraftValue(draft.origin?.source) &&
-      nextOrigin &&
-      nextOrigin !== formRef.current.origin
+      shouldApplyTextValue(
+        draft.origin?.source,
+        nextOrigin,
+        formRef.current.origin,
+      )
     ) {
       formRef.current.origin = nextOrigin;
       setOrigin(nextOrigin);
@@ -134,9 +178,11 @@ export function useShipmentDraftFormSync({
     const nextDestination = asString(draft.destination?.value);
 
     if (
-      shouldApplyDraftValue(draft.destination?.source) &&
-      nextDestination &&
-      nextDestination !== formRef.current.destination
+      shouldApplyTextValue(
+        draft.destination?.source,
+        nextDestination,
+        formRef.current.destination,
+      )
     ) {
       formRef.current.destination = nextDestination;
       setDestination(nextDestination);
@@ -147,9 +193,11 @@ export function useShipmentDraftFormSync({
     const nextDropDate = isoToDate(draft.dropOffDate?.value);
 
     if (
-      shouldApplyDraftValue(draft.dropOffDate?.source) &&
-      nextDropDate &&
-      !datesSame(nextDropDate, formRef.current.dropDate)
+      shouldApplyDateValue(
+        draft.dropOffDate?.source,
+        nextDropDate,
+        formRef.current.dropDate,
+      )
     ) {
       formRef.current.dropDate = nextDropDate;
       setDropDate(nextDropDate);
@@ -160,26 +208,26 @@ export function useShipmentDraftFormSync({
     const nextDeliveryDate = isoToDate(draft.deliveryDate?.value);
 
     if (
-      shouldApplyDraftValue(draft.deliveryDate?.source) &&
-      nextDeliveryDate &&
-      !datesSame(nextDeliveryDate, formRef.current.deliveryDate)
+      shouldApplyDateValue(
+        draft.deliveryDate?.source,
+        nextDeliveryDate,
+        formRef.current.deliveryDate,
+      )
     ) {
       formRef.current.deliveryDate = nextDeliveryDate;
       setDeliveryDate(nextDeliveryDate);
     }
-  }, [
-    draft.deliveryDate?.value,
-    draft.deliveryDate?.source,
-    setDeliveryDate,
-  ]);
+  }, [draft.deliveryDate?.value, draft.deliveryDate?.source, setDeliveryDate]);
 
   useEffect(() => {
     const nextWeight = asString(draft.weightLbs?.value);
 
     if (
-      shouldApplyDraftValue(draft.weightLbs?.source) &&
-      nextWeight &&
-      nextWeight !== formRef.current.weightLbs
+      shouldApplyTextValue(
+        draft.weightLbs?.source,
+        nextWeight,
+        formRef.current.weightLbs,
+      )
     ) {
       formRef.current.weightLbs = nextWeight;
       setWeightLbs(nextWeight);
@@ -194,10 +242,14 @@ export function useShipmentDraftFormSync({
 
     if (nextItemsKey === lastAppliedItemsRef.current) return;
 
+    if (!packagesAreEffectivelyEmpty(formRef.current.packages)) return;
+
     if (!itemsSame(draft.items, formRef.current.packages)) {
+      const nextItems = clonePackages(draft.items);
+
       lastAppliedItemsRef.current = nextItemsKey;
-      formRef.current.packages = draft.items;
-      setPackages(draft.items);
+      formRef.current.packages = nextItems;
+      setPackages(nextItems);
     }
   }, [draft.items, setPackages]);
 }

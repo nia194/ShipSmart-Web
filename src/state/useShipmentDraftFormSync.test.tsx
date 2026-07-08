@@ -1,87 +1,150 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-import { ShipmentDraftProvider, useShipmentDraft } from "@/state/ShipmentDraftContext";
+import {
+  ShipmentDraftProvider,
+  useShipmentDraft,
+} from "@/state/ShipmentDraftContext";
 import { useShipmentDraftFormSync } from "@/state/useShipmentDraftFormSync";
 
-/** A tiny stand-in for the homepage form: local field state + the sync hook. */
-function Harness() {
+function HarnessInner() {
   const [origin, setOrigin] = useState("");
-  const [dest, setDest] = useState("");
-  const [weight, setWeight] = useState("");
+  const [destination, setDestination] = useState("");
+  const [dropDate, setDropDate] = useState<Date | undefined>();
+  const [deliveryDate, setDeliveryDate] = useState<Date | undefined>();
+  const [weightLbs, setWeightLbs] = useState("");
+
+  const { draft, applyPatch, conflicts } = useShipmentDraft();
 
   useShipmentDraftFormSync({
     origin,
     setOrigin,
-    destination: dest,
-    setDestination: setDest,
-    dropDate: undefined,
-    setDropDate: () => {},
-    deliveryDate: undefined,
-    setDeliveryDate: () => {},
-    weightLbs: weight,
-    setWeightLbs: setWeight,
+    destination,
+    setDestination,
+    dropDate,
+    setDropDate,
+    deliveryDate,
+    setDeliveryDate,
+    weightLbs,
+    setWeightLbs,
   });
 
-  const { draft, applyPatch, conflicts } = useShipmentDraft();
   return (
     <div>
       <span data-testid="form-origin">{origin}</span>
-      <span data-testid="form-weight">{weight}</span>
-      <span data-testid="draft-dest">{(draft.destination?.value as string) ?? ""}</span>
+      <span data-testid="form-dest">{destination}</span>
+      <span data-testid="form-weight">{weightLbs}</span>
+      <span data-testid="form-drop-date">
+        {dropDate ? dropDate.toISOString().slice(0, 10) : ""}
+      </span>
+      <span data-testid="form-delivery-date">
+        {deliveryDate ? deliveryDate.toISOString().slice(0, 10) : ""}
+      </span>
+
+      <span data-testid="draft-origin">{String(draft.origin?.value ?? "")}</span>
+      <span data-testid="draft-dest">
+        {String(draft.destination?.value ?? "")}
+      </span>
       <span data-testid="conflict-count">{conflicts.length}</span>
-      <button type="button" onClick={() => setOrigin("Boston, MA")}>
+
+      <button type="button" onClick={() => setOrigin("Atlanta, GA")}>
         type-origin
       </button>
-      <button type="button" onClick={() => setDest("Seattle, WA")}>
+
+      <button type="button" onClick={() => setDestination("Seattle, WA")}>
         type-dest
       </button>
-      <button type="button" onClick={() => applyPatch({ origin: "Atlanta, GA", weightLbs: 12 }, "chat")}>
+
+      <button
+        type="button"
+        onClick={() =>
+          applyPatch(
+            {
+              origin: "Atlanta, GA",
+              destination: "Seattle, WA",
+              weightLbs: "12",
+              dropOffDate: "2026-07-10",
+              deliveryDate: "2026-07-12",
+            },
+            "chat",
+          )
+        }
+      >
         chat-fill
       </button>
-      <button type="button" onClick={() => applyPatch({ origin: "Atlanta, GA" }, "chat")}>
+
+      <button
+        type="button"
+        onClick={() =>
+          applyPatch(
+            {
+              origin: "Atlanta, Georgia",
+            },
+            "chat",
+          )
+        }
+      >
         chat-origin
       </button>
     </div>
   );
 }
 
-const renderHarness = () =>
-  render(
+function renderHarness() {
+  return render(
     <ShipmentDraftProvider>
-      <Harness />
+      <HarnessInner />
     </ShipmentDraftProvider>,
   );
+}
 
 describe("useShipmentDraftFormSync", () => {
-  it("pre-fills the form from chat-extracted draft slots (draft → form)", async () => {
+  it("pre-fills the form from chat-extracted draft slots", async () => {
     renderHarness();
+
     fireEvent.click(screen.getByText("chat-fill"));
+
     await waitFor(() => {
       expect(screen.getByTestId("form-origin").textContent).toBe("Atlanta, GA");
+      expect(screen.getByTestId("form-dest").textContent).toBe("Seattle, WA");
       expect(screen.getByTestId("form-weight").textContent).toBe("12");
+      expect(screen.getByTestId("form-drop-date").textContent).toBe(
+        "2026-07-10",
+      );
+      expect(screen.getByTestId("form-delivery-date").textContent).toBe(
+        "2026-07-12",
+      );
     });
   });
 
-  it("writes manual form edits into the shared draft (form → draft)", async () => {
+  it("does not write manual form edits back into the shared draft", async () => {
     renderHarness();
+
     fireEvent.click(screen.getByText("type-dest"));
-    await waitFor(() =>
-      expect(screen.getByTestId("draft-dest").textContent).toBe("Seattle, WA"),
-    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("form-dest").textContent).toBe("Seattle, WA");
+      expect(screen.getByTestId("draft-dest").textContent).toBe("");
+    });
   });
 
-  it("keeps a manually-typed value over a conflicting chat suggestion (form wins)", async () => {
+  it("does not silently overwrite a manually typed form value with a chat suggestion", async () => {
     renderHarness();
-    fireEvent.click(screen.getByText("type-origin")); // user types Boston, MA
-    await waitFor(() => expect(screen.getByTestId("form-origin").textContent).toBe("Boston, MA"));
 
-    fireEvent.click(screen.getByText("chat-origin")); // chat suggests a different Atlanta, GA
-    await waitFor(() =>
-      expect(Number(screen.getByTestId("conflict-count").textContent)).toBeGreaterThan(0),
-    );
-    // the typed value is preserved (not silently overwritten); the conflict is recorded
-    expect(screen.getByTestId("form-origin").textContent).toBe("Boston, MA");
+    fireEvent.click(screen.getByText("type-origin"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("form-origin").textContent).toBe("Atlanta, GA");
+    });
+
+    fireEvent.click(screen.getByText("chat-origin"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("form-origin").textContent).toBe("Atlanta, GA");
+      expect(screen.getByTestId("draft-origin").textContent).toBe(
+        "Atlanta, Georgia",
+      );
+    });
   });
 });
