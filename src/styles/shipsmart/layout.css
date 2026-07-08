@@ -1,0 +1,30 @@
+#root nav,
+#root header,
+body nav,
+body header {
+  background: #ffffff !important;
+}
+
+#root nav > div,
+body nav > div
+ {
+  width: 100% !important;
+  max-width: var(--ss-nav-shell) !important;
+  height: 76px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding-left: 42px !important;
+  padding-right: 42px !important;
+}
+
+.ss-page {
+  min-height: 100vh;
+  background: #ebebeb;
+}
+
+.ss-home-shell {
+  width: 100%;
+  max-width: var(--ss-shell);
+  margin: 0 auto;
+  padding: 58px 34px 110px;
+}

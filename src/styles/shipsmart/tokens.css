@@ -1,0 +1,12 @@
+:root {
+  --ss-nav-shell: 1680px;
+  --ss-shell: 1480px;
+  --ss-blue: #2456d6;
+  --ss-blue-2: #315bff;
+  --ss-text: #09090b;
+  --ss-muted: #5f6878;
+  --ss-soft-muted: #8a94a6;
+  --ss-border: #d8dfeb;
+  --ss-page: #eeeeef;
+  --ss-card: #ffffff;
+}

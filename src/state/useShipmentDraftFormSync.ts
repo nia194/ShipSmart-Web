@@ -1,101 +1,255 @@
-/**
- * Two-way sync between the conventional shipment form fields and the shared
- * ShipmentDraft, so the conversational concierge can PRE-FILL the form
- * (draft → form) and knows what the user already typed (form → draft).
- *
- * Manual form edits use the "form" source, which the draft's merge rules treat as
- * authoritative (they win, or surface a conflict the ConciergePanel resolves); the
- * concierge writes with the "chat" source and only fills genuine gaps. The effects
- * converge (a mirrored value normalizes to a no-op), so there is no render loop.
- *
- * Must be called within a ShipmentDraftProvider.
- */
-import { useEffect } from "react";
-
-import { format } from "date-fns";
-
+import { useEffect, useRef } from "react";
 import { useShipmentDraft } from "@/state/ShipmentDraftContext";
+import type { PackageItem } from "@/lib/shipping-data";
 
-export interface FormDraftBinding {
+type DateValue = Date | undefined;
+
+type UseShipmentDraftFormSyncArgs = {
   origin: string;
-  setOrigin: (v: string) => void;
+  setOrigin: (value: string) => void;
+
   destination: string;
-  setDestination: (v: string) => void;
-  dropDate?: Date;
-  setDropDate: (d: Date | undefined) => void;
-  deliveryDate?: Date;
-  setDeliveryDate: (d: Date | undefined) => void;
-  /** Primary package weight, as the form stores it (a string). */
+  setDestination: (value: string) => void;
+
+  dropDate: DateValue;
+  setDropDate: (value: DateValue) => void;
+
+  deliveryDate: DateValue;
+  setDeliveryDate: (value: DateValue) => void;
+
   weightLbs: string;
-  setWeightLbs: (v: string) => void;
+  setWeightLbs: (value: string) => void;
+
+  packages?: PackageItem[];
+  setPackages?: (items: PackageItem[]) => void;
+};
+
+function isEmpty(value: unknown) {
+  return value === undefined || value === null || String(value).trim() === "";
 }
 
-const iso = (d?: Date) => (d ? format(d, "yyyy-MM-dd") : "");
-
-function parseIso(v: string): Date | undefined {
-  const d = new Date(`${v}T00:00:00`);
-  return Number.isNaN(d.getTime()) ? undefined : d;
+function asString(value: unknown) {
+  if (isEmpty(value)) return "";
+  return String(value);
 }
 
-export function useShipmentDraftFormSync(form: FormDraftBinding): void {
-  const { draft, setField } = useShipmentDraft();
+function dateToIso(date: DateValue) {
+  if (!date || Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
 
-  // ── form → draft (user edits; "form" wins / records conflicts) ──────────────
-  useEffect(() => {
-    if (form.origin) setField("origin", form.origin, "form");
-  }, [form.origin, setField]);
-  useEffect(() => {
-    if (form.destination) setField("destination", form.destination, "form");
-  }, [form.destination, setField]);
-  useEffect(() => {
-    const s = iso(form.dropDate);
-    if (s) setField("dropOffDate", s, "form");
-  }, [form.dropDate, setField]);
-  useEffect(() => {
-    const s = iso(form.deliveryDate);
-    if (s) setField("deliveryDate", s, "form");
-  }, [form.deliveryDate, setField]);
-  useEffect(() => {
-    const w = Number.parseFloat(form.weightLbs);
-    if (Number.isFinite(w) && w > 0) setField("weightLbs", w, "form");
-  }, [form.weightLbs, setField]);
+function isoToDate(value: unknown): DateValue {
+  if (isEmpty(value)) return undefined;
 
-  // ── draft → form (concierge pre-fills; only when it genuinely differs) ──────
-  const dOrigin = draft.origin?.value;
-  useEffect(() => {
-    if (typeof dOrigin === "string" && dOrigin && dOrigin !== form.origin) form.setOrigin(dOrigin);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dOrigin]);
+  const text = String(value).slice(0, 10);
+  const date = new Date(`${text}T00:00:00`);
 
-  const dDest = draft.destination?.value;
-  useEffect(() => {
-    if (typeof dDest === "string" && dDest && dDest !== form.destination) form.setDestination(dDest);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dDest]);
+  if (Number.isNaN(date.getTime())) return undefined;
 
-  const dDrop = draft.dropOffDate?.value;
+  return date;
+}
+
+function datesSame(a: DateValue, b: DateValue) {
+  return dateToIso(a) === dateToIso(b);
+}
+
+function shouldApplyDraftValue(source: unknown) {
+  return source === "chat" || source === "hydrated";
+}
+
+function shouldApplyTextValue(source: unknown, nextValue: string, currentValue: string) {
+  if (!shouldApplyDraftValue(source)) return false;
+  if (!nextValue) return false;
+  if (nextValue === currentValue) return false;
+
+  // Do not let chat silently overwrite what the user already typed.
+  return isEmpty(currentValue);
+}
+
+function shouldApplyDateValue(
+  source: unknown,
+  nextValue: DateValue,
+  currentValue: DateValue,
+) {
+  if (!shouldApplyDraftValue(source)) return false;
+  if (!nextValue) return false;
+  if (datesSame(nextValue, currentValue)) return false;
+
+  // Do not let chat silently overwrite a manually selected date.
+  return !currentValue;
+}
+
+function isPackageFieldEmpty(value: unknown) {
+  return value === undefined || value === null || String(value).trim() === "";
+}
+
+function isPackageEffectivelyEmpty(pkg: PackageItem) {
+  return (
+    isPackageFieldEmpty(pkg.weight) &&
+    isPackageFieldEmpty(pkg.l) &&
+    isPackageFieldEmpty(pkg.w) &&
+    isPackageFieldEmpty(pkg.h)
+  );
+}
+
+function packagesAreEffectivelyEmpty(packages?: PackageItem[]) {
+  if (!packages?.length) return true;
+  return packages.every(isPackageEffectivelyEmpty);
+}
+
+function itemsSame(a?: PackageItem[], b?: PackageItem[]) {
+  return JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
+}
+
+function clonePackages(items: PackageItem[]) {
+  return items.map((item) => ({ ...item }));
+}
+
+export function useShipmentDraftFormSync({
+  origin,
+  setOrigin,
+  destination,
+  setDestination,
+  dropDate,
+  setDropDate,
+  deliveryDate,
+  setDeliveryDate,
+  weightLbs,
+  setWeightLbs,
+  packages,
+  setPackages,
+}: UseShipmentDraftFormSyncArgs) {
+  const { draft } = useShipmentDraft();
+
+  const formRef = useRef({
+    origin,
+    destination,
+    dropDate,
+    deliveryDate,
+    weightLbs,
+    packages,
+  });
+
+  const lastAppliedItemsRef = useRef("");
+
   useEffect(() => {
-    if (typeof dDrop === "string" && dDrop && dDrop !== iso(form.dropDate)) {
-      const d = parseIso(dDrop);
-      if (d) form.setDropDate(d);
+    formRef.current.origin = origin;
+  }, [origin]);
+
+  useEffect(() => {
+    formRef.current.destination = destination;
+  }, [destination]);
+
+  useEffect(() => {
+    formRef.current.dropDate = dropDate;
+  }, [dropDate]);
+
+  useEffect(() => {
+    formRef.current.deliveryDate = deliveryDate;
+  }, [deliveryDate]);
+
+  useEffect(() => {
+    formRef.current.weightLbs = weightLbs;
+  }, [weightLbs]);
+
+  useEffect(() => {
+    formRef.current.packages = packages;
+  }, [packages]);
+
+  // Assistant/draft -> visible form only.
+  // Do not write form -> draft on every keypress. That was causing input glitches.
+
+  useEffect(() => {
+    const nextOrigin = asString(draft.origin?.value);
+
+    if (
+      shouldApplyTextValue(
+        draft.origin?.source,
+        nextOrigin,
+        formRef.current.origin,
+      )
+    ) {
+      formRef.current.origin = nextOrigin;
+      setOrigin(nextOrigin);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dDrop]);
+  }, [draft.origin?.value, draft.origin?.source, setOrigin]);
 
-  const dDeliv = draft.deliveryDate?.value;
   useEffect(() => {
-    if (typeof dDeliv === "string" && dDeliv && dDeliv !== iso(form.deliveryDate)) {
-      const d = parseIso(dDeliv);
-      if (d) form.setDeliveryDate(d);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dDeliv]);
+    const nextDestination = asString(draft.destination?.value);
 
-  const dWeight = draft.weightLbs?.value;
-  useEffect(() => {
-    if (typeof dWeight === "number" && dWeight > 0 && String(dWeight) !== form.weightLbs) {
-      form.setWeightLbs(String(dWeight));
+    if (
+      shouldApplyTextValue(
+        draft.destination?.source,
+        nextDestination,
+        formRef.current.destination,
+      )
+    ) {
+      formRef.current.destination = nextDestination;
+      setDestination(nextDestination);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dWeight]);
+  }, [draft.destination?.value, draft.destination?.source, setDestination]);
+
+  useEffect(() => {
+    const nextDropDate = isoToDate(draft.dropOffDate?.value);
+
+    if (
+      shouldApplyDateValue(
+        draft.dropOffDate?.source,
+        nextDropDate,
+        formRef.current.dropDate,
+      )
+    ) {
+      formRef.current.dropDate = nextDropDate;
+      setDropDate(nextDropDate);
+    }
+  }, [draft.dropOffDate?.value, draft.dropOffDate?.source, setDropDate]);
+
+  useEffect(() => {
+    const nextDeliveryDate = isoToDate(draft.deliveryDate?.value);
+
+    if (
+      shouldApplyDateValue(
+        draft.deliveryDate?.source,
+        nextDeliveryDate,
+        formRef.current.deliveryDate,
+      )
+    ) {
+      formRef.current.deliveryDate = nextDeliveryDate;
+      setDeliveryDate(nextDeliveryDate);
+    }
+  }, [draft.deliveryDate?.value, draft.deliveryDate?.source, setDeliveryDate]);
+
+  useEffect(() => {
+    const nextWeight = asString(draft.weightLbs?.value);
+
+    if (
+      shouldApplyTextValue(
+        draft.weightLbs?.source,
+        nextWeight,
+        formRef.current.weightLbs,
+      )
+    ) {
+      formRef.current.weightLbs = nextWeight;
+      setWeightLbs(nextWeight);
+    }
+  }, [draft.weightLbs?.value, draft.weightLbs?.source, setWeightLbs]);
+
+  useEffect(() => {
+    if (!setPackages) return;
+    if (!draft.items?.length) return;
+
+    const nextItemsKey = JSON.stringify(draft.items);
+
+    if (nextItemsKey === lastAppliedItemsRef.current) return;
+
+    if (!packagesAreEffectivelyEmpty(formRef.current.packages)) return;
+
+    if (!itemsSame(draft.items, formRef.current.packages)) {
+      const nextItems = clonePackages(draft.items);
+
+      lastAppliedItemsRef.current = nextItemsKey;
+      formRef.current.packages = nextItems;
+      setPackages(nextItems);
+    }
+  }, [draft.items, setPackages]);
 }

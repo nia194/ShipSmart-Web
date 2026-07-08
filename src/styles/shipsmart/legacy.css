@@ -1,0 +1,78 @@
+/* src/styles/shipsmart/legacy.css */
+
+/*
+  These classes are still used by older ShipSmart components/pages.
+  Keep them here so the new homepage split does not break SavedPage,
+  old quote UI pieces, or older form components.
+*/
+
+.ss-card {
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 1px 16px rgba(0, 0, 0, 0.035);
+  overflow: visible;
+  margin-bottom: 10px;
+  position: relative;
+}
+
+.ss-pkg-item {
+  background: #ffffff;
+  border: 1.5px solid var(--ss-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+
+.ss-pkg-item.err {
+  border-color: #fca5a5;
+}
+
+.ss-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 14px;
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ss-sel-h {
+  padding: 5px 10px;
+  border: 1.5px solid var(--ss-border);
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ss-muted);
+  cursor: pointer;
+  background: #ffffff;
+}
+
+.ss-sel-h.on {
+  border-color: var(--ss-blue);
+  background: #f0f5ff;
+  color: var(--ss-blue);
+}
+
+.ss-nav-link {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--ss-muted);
+  background: transparent;
+  border: none;
+}
+
+.ss-nav-link:hover,
+.ss-nav-link.active {
+  color: var(--ss-blue);
+  background: #f0f5ff;
+}

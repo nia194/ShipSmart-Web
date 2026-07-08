@@ -7,7 +7,7 @@ import { TIER_BADGES, type ShippingService } from "@/lib/shipping-data";
 import { supabase } from "@/integrations/supabase/client";
 import { apiConfig, javaApi } from "@/config/api";
 
-const COLS = "36px 1fr 70px 80px 110px 40px 24px";
+const COLS = "36px minmax(0, 1fr) 70px 80px 120px 42px 22px";
 
 interface DetailProps {
   svc: ShippingService;
@@ -60,7 +60,10 @@ function getTrackingLabel(features: string[]) {
   return hasTracking ? "Full tracking" : "Carrier tracking";
 }
 
-function getInsuranceLabel(details: Record<string, unknown>, features: string[]) {
+function getInsuranceLabel(
+  details: Record<string, unknown>,
+  features: string[],
+) {
   const insurance = getDetailValue(details, ["insurance"], "");
 
   if (insurance) return insurance;
@@ -80,7 +83,10 @@ function getCutoffLabel(details: Record<string, unknown>) {
   );
 }
 
-function getGuaranteeLabel(details: Record<string, unknown>, svc: ShippingService) {
+function getGuaranteeLabel(
+  details: Record<string, unknown>,
+  svc: ShippingService,
+) {
   const guarantee = getDetailValue(details, ["guarantee"], "");
 
   if (guarantee) return guarantee;
@@ -177,13 +183,7 @@ function SectionMark({ icon, title }: { icon: string; title: string }) {
   );
 }
 
-function MiniFact({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function MiniFact({ label, value }: { label: string; value: string }) {
   return (
     <div
       style={{
@@ -347,7 +347,8 @@ function CompactBreakdown({ svc }: { svc: ShippingService }) {
               color: "#64748b",
             }}
           >
-            + {rows.length - 5} more line item{rows.length - 5 === 1 ? "" : "s"}
+            + {rows.length - 5} more line item
+            {rows.length - 5 === 1 ? "" : "s"}
           </div>
         )}
       </div>
@@ -447,12 +448,7 @@ const Detail = ({ svc, open, bookUrl, onBook }: DetailProps) => {
           <CompactBreakdown svc={svc} />
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gap: 10,
-          }}
-        >
+        <div style={{ display: "grid", gap: 10 }}>
           {svc.promo && (
             <div
               style={{
@@ -607,21 +603,23 @@ export const ColHeader = () => (
       alignItems: "center",
     }}
   >
-    {["", "Service", "Transit", "Tier", "Rate", "", ""].map((heading, index) => (
-      <span
-        key={index}
-        style={{
-          fontSize: 10,
-          fontWeight: 700,
-          color: "#b0b5c0",
-          textTransform: "uppercase",
-          letterSpacing: ".8px",
-          textAlign: index === 4 ? "right" : index >= 2 ? "center" : "left",
-        }}
-      >
-        {heading}
-      </span>
-    ))}
+    {["", "Service", "Transit", "Tier", "Rate", "", ""].map(
+      (heading, index) => (
+        <span
+          key={index}
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            color: "#b0b5c0",
+            textTransform: "uppercase",
+            letterSpacing: ".8px",
+            textAlign: index === 4 ? "right" : index >= 2 ? "center" : "left",
+          }}
+        >
+          {heading}
+        </span>
+      ),
+    )}
   </div>
 );
 
@@ -660,7 +658,7 @@ export const Row = ({
 
     if (!isSaved) {
       setJustSaved(true);
-      setTimeout(() => setJustSaved(false), 500);
+      window.setTimeout(() => setJustSaved(false), 500);
     }
   };
 
@@ -734,7 +732,9 @@ export const Row = ({
               minWidth: 0,
             }}
           >
-            <span style={{ fontSize: 11, color: "#9ca3af" }}>{svc.carrier}</span>
+            <span style={{ fontSize: 11, color: "#9ca3af" }}>
+              {svc.carrier}
+            </span>
 
             {svc.guaranteed && (
               <span
@@ -825,11 +825,13 @@ export const Row = ({
           }}
         >
           <button
+            type="button"
             className={`ss-save-btn ${isSaved ? "saved" : ""} ${
               justSaved ? "just-saved" : ""
             }`}
             onClick={handleSave}
             title={isSaved ? "Saved" : "Save"}
+            aria-label={isSaved ? "Saved" : "Save shipping option"}
           >
             <BookmarkIcon filled={isSaved} justSaved={justSaved} />
           </button>
@@ -897,7 +899,12 @@ export const Section = ({
   const [more, setMore] = useState(false);
 
   return (
-    <div style={{ marginBottom: 22, animation: `fadeUp .35s ${animBase}s both` }}>
+    <div
+      style={{
+        marginBottom: 22,
+        animation: `fadeUp .35s ${animBase}s both`,
+      }}
+    >
       <div
         style={{
           display: "flex",

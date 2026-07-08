@@ -113,7 +113,7 @@ function AppHeader() {
     >
       <div
         style={{
-          maxWidth: 760,
+          maxWidth: 1600,
           height: 86,
           margin: "0 auto",
           padding: "0 20px",
