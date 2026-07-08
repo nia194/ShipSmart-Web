@@ -1,3 +1,5 @@
+// src/components/shipping/PackageTypeDropDown.tsx
+
 import {
   useCallback,
   useEffect,
@@ -42,7 +44,7 @@ export function PackageTypeDropdown({
       top: rect.bottom - 1,
       left: rect.left,
       width: rect.width,
-      maxHeight: Math.max(260, Math.min(460, spaceBelow)),
+      maxHeight: Math.max(220, Math.min(420, spaceBelow)),
     });
   }, []);
 
@@ -92,10 +94,12 @@ export function PackageTypeDropdown({
           onClick={() => setOpen((prev) => !prev)}
           style={{
             width: "100%",
+            height: 54,
+            minHeight: 54,
             display: "flex",
             alignItems: "center",
-            gap: 14,
-            padding: "16px 18px",
+            gap: 10,
+            padding: "8px 12px",
             borderRadius: open ? "12px 12px 0 0" : 12,
             border: open ? "2px solid #2563eb" : "1px solid #d1d5db",
             background: open ? "#eef7ff" : "#ffffff",
@@ -107,36 +111,29 @@ export function PackageTypeDropdown({
         >
           <PackageImage pkg={selected} />
 
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: 15,
-                fontWeight: 800,
-                color: "#111827",
-                lineHeight: 1.25,
-              }}
-            >
-              {selected.title ?? selected.label}
-            </div>
-
-            <div
-              style={{
-                fontSize: 13,
-                color: "#8b95a1",
-                marginTop: 4,
-                lineHeight: 1.35,
-              }}
-            >
-              {selected.subtitle ?? selected.label}
-            </div>
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              fontSize: 15,
+              fontWeight: 800,
+              color: "#111827",
+              lineHeight: 1.2,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {selected.title ?? selected.label}
           </div>
 
           <span
             style={{
-              fontSize: 14,
+              fontSize: 13,
               color: "#374151",
               transform: open ? "rotate(180deg)" : "rotate(0deg)",
               transition: "transform 0.2s ease",
+              flexShrink: 0,
             }}
           >
             ▾
@@ -177,12 +174,13 @@ export function PackageTypeDropdown({
                   }}
                   style={{
                     width: "100%",
+                    minHeight: 56,
                     display: "flex",
                     alignItems: "center",
-                    gap: 14,
-                    padding: "16px 18px",
+                    gap: 12,
+                    padding: "11px 14px",
                     border: "none",
-                    borderBottom: "1px solid #d1d5db",
+                    borderBottom: "1px solid #e5e7eb",
                     background: active ? "#eaf4ff" : "#ffffff",
                     cursor: "pointer",
                     fontFamily: "inherit",
@@ -191,28 +189,20 @@ export function PackageTypeDropdown({
                 >
                   <PackageImage pkg={pkg} />
 
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontSize: 15,
-                        fontWeight: 800,
-                        color: "#111827",
-                        lineHeight: 1.25,
-                      }}
-                    >
-                      {pkg.title ?? pkg.label}
-                    </div>
-
-                    <div
-                      style={{
-                        fontSize: 13,
-                        color: "#8b95a1",
-                        marginTop: 4,
-                        lineHeight: 1.35,
-                      }}
-                    >
-                      {pkg.subtitle ?? pkg.label}
-                    </div>
+                  <div
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      fontSize: 15,
+                      fontWeight: 800,
+                      color: "#111827",
+                      lineHeight: 1.2,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {pkg.title ?? pkg.label}
                   </div>
 
                   {active && (
@@ -252,15 +242,15 @@ function PackageImage({
     return (
       <div
         style={{
-          width: 58,
-          height: 58,
+          width: 42,
+          height: 42,
           borderRadius: 10,
           background: "#f8fafc",
           border: "1px solid #e5e7eb",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 28,
+          fontSize: 22,
           flexShrink: 0,
         }}
       >
@@ -272,8 +262,8 @@ function PackageImage({
   return (
     <div
       style={{
-        width: 58,
-        height: 58,
+        width: 42,
+        height: 42,
         borderRadius: 10,
         background: "#f8fafc",
         border: "1px solid #e5e7eb",

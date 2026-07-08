@@ -9,11 +9,11 @@ import { filterCities } from "@/lib/shipping-data";
 
 interface CityInputProps {
   value: string;
-  onChange: (v: string) => void;
+  onChange: (value: string) => void;
   onSelect: (city: string) => void;
   placeholder: string;
   icon: string;
-  inputRef?: RefObject<HTMLInputElement>;
+  inputRef?: RefObject<HTMLInputElement | null>;
 }
 
 export const CityInput = ({
@@ -28,11 +28,12 @@ export const CityInput = ({
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const internalInputRef = useRef<HTMLInputElement | null>(null);
 
+  const finalInputRef = inputRef ?? internalInputRef;
+
   const suggestions = useMemo(() => {
     return focused ? filterCities(value) : [];
   }, [value, focused]);
 
-  const finalInputRef = inputRef ?? internalInputRef;
   const showSuggestions = focused && suggestions.length > 0;
 
   useEffect(() => {
@@ -112,7 +113,7 @@ export const CityInput = ({
             paddingLeft: 40,
             paddingRight: value ? 42 : 14,
             height: 52,
-            borderRadius: 12,
+            borderRadius: focused ? 999 : 12,
             border: focused ? "1px solid #e5e7eb" : "1px solid #d1d5db",
             boxShadow: focused
               ? "0 12px 34px rgba(15, 23, 42, 0.14)"
@@ -140,9 +141,6 @@ export const CityInput = ({
               color: "#111827",
               fontSize: 20,
               cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
               lineHeight: 1,
             }}
           >
@@ -155,19 +153,18 @@ export const CityInput = ({
         <div
           style={{
             position: "absolute",
-            top: 66,
+            top: 58,
             left: 0,
             right: 0,
-            zIndex: 99999,
+            zIndex: 100,
+            borderRadius: 18,
             background: "#ffffff",
-            borderRadius: 28,
-            boxShadow: "0 22px 60px rgba(15, 23, 42, 0.18)",
-            border: "1px solid #f1f5f9",
-            padding: "18px 0",
+            border: "1px solid #e5e7eb",
+            boxShadow: "0 18px 50px rgba(15, 23, 42, 0.18)",
             overflow: "hidden",
           }}
         >
-          {suggestions.map((city) => (
+          {suggestions.slice(0, 6).map((city) => (
             <button
               key={city}
               type="button"
@@ -179,13 +176,13 @@ export const CityInput = ({
                 width: "100%",
                 border: "none",
                 background: "#ffffff",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 18,
-                padding: "12px 32px",
-                fontFamily: "inherit",
+                padding: "12px 14px",
                 textAlign: "left",
+                fontSize: 14,
+                fontWeight: 700,
+                color: "#111827",
+                cursor: "pointer",
+                fontFamily: "inherit",
               }}
               onMouseEnter={(event) => {
                 event.currentTarget.style.background = "#f8fafc";
@@ -194,31 +191,7 @@ export const CityInput = ({
                 event.currentTarget.style.background = "#ffffff";
               }}
             >
-              <span
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: 14,
-                  background: "#f4f4f5",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <LocationPinIcon />
-              </span>
-
-              <span
-                style={{
-                  fontSize: 15,
-                  fontWeight: 500,
-                  color: "#111827",
-                  lineHeight: 1.2,
-                }}
-              >
-                {city}
-              </span>
+              {city}
             </button>
           ))}
         </div>
@@ -226,21 +199,3 @@ export const CityInput = ({
     </div>
   );
 };
-
-function LocationPinIcon() {
-  return (
-    <svg
-      width="30"
-      height="30"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#111827"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 21s7-5.1 7-11a7 7 0 1 0-14 0c0 5.9 7 11 7 11Z" />
-      <circle cx="12" cy="10" r="2.5" />
-    </svg>
-  );
-}

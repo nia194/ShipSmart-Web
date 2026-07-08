@@ -47,12 +47,11 @@ export const apiConfig = {
   useWorkflow: import.meta.env.VITE_USE_WORKFLOW === "true",
 
   /**
-   * Feature flag: show the Conversational Concierge — the shipment-setup assistant
-   * on the homepage, shared with the form via the ShipmentDraft store (it pre-fills
-   * the form as you chat). ON by default; set VITE_USE_CONCIERGE=false to hide it
-   * (the form then behaves exactly as before).
+   * Feature flag: show the Conversational Concierge chat, shared with the form
+   * via the ShipmentDraft store. Set VITE_USE_CONCIERGE=true to enable.
+   * Defaults to false (the panel stays hidden; the form behaves exactly as today).
    */
-  useConcierge: import.meta.env.VITE_USE_CONCIERGE !== "false",
+  useConcierge: import.meta.env.VITE_USE_CONCIERGE === "true",
 
   /**
    * Shipping-scope policy (mirrors the API's SHIPPING_SCOPE; published on
