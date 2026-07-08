@@ -34,16 +34,11 @@ and the Python AI/orchestration API
 
 ## The ShipSmart ecosystem
 
-<<<<<<< HEAD
-This frontend is one of five sibling repositories. Clone them as
-siblings of this directory when working on the full system.
-=======
 This frontend is one of six sibling repositories. Clone them as
 siblings of this directory when working on the full system.
 All six are also mirrored together in
 **[ShipSmart](https://github.com/nia194/ShipSmart)** — the umbrella
 repository that snapshots each component at its latest stable milestone.
->>>>>>> bb14dc57886387914f768c3f801095be4d752cd1
 
 | Repo | Role | Stack |
 |---|---|---|
@@ -52,10 +47,7 @@ repository that snapshots each component at its latest stable milestone.
 | [ShipSmart-API](https://github.com/nia194/ShipSmart-API) | Python AI/orchestration service — RAG, advisors, recommendations, compliance (UC2), multi-agent workflow (UC3/UC4) | FastAPI, Python 3.13 |
 | [ShipSmart-MCP](https://github.com/nia194/ShipSmart-MCP) | MCP tool server — `validate_address`, `get_quote_preview` (provider-pluggable) | FastAPI + MCP |
 | [ShipSmart-Infra](https://github.com/nia194/ShipSmart-Infra) | Supabase migrations + edge functions, deployment configs, docs | Supabase, Render blueprints |
-<<<<<<< HEAD
-=======
 | [ShipSmart-Test](https://github.com/nia194/ShipSmart-Test) | Cross-repo integration harness — contract + live e2e suites, cross-service Postman collection | Python 3.13, pytest |
->>>>>>> bb14dc57886387914f768c3f801095be4d752cd1
 
 ```
                 ┌───────────────────────────────────────────────────┐
@@ -137,12 +129,7 @@ src/
 ├── hooks/                         TanStack Query / data hooks
 │   ├── useShippingQuotes.ts       Java /quotes (or Supabase edge fn fallback)
 │   ├── useSavedOptions.ts         Java /saved-options (or Supabase edge fn fallback)
-<<<<<<< HEAD
-│   ├── use-toast.ts               Radix toast state
-│   └── use-mobile.tsx             Viewport breakpoint hook
-=======
 │   └── use-toast.ts               Radix toast state
->>>>>>> bb14dc57886387914f768c3f801095be4d752cd1
 └── styles/                        Global stylesheet (shipsmart.css)
 ```
 
@@ -183,10 +170,6 @@ VITE_SUPABASE_URL=https://<project>.supabase.co
 VITE_SUPABASE_ANON_KEY=<anon key — Settings → API in Supabase>
 VITE_JAVA_API_BASE_URL=http://localhost:8080
 VITE_PYTHON_API_BASE_URL=http://localhost:8000
-<<<<<<< HEAD
-VITE_APP_ENV=development
-=======
->>>>>>> bb14dc57886387914f768c3f801095be4d752cd1
 
 # Feature flags — set to "false" to fall back to Supabase edge functions.
 VITE_USE_JAVA_QUOTES=true
@@ -196,10 +179,6 @@ VITE_USE_JAVA_BOOKING_REDIRECT=true
 # Multi-agent workflow page (UC3/UC4) — off by default (route + nav hidden).
 VITE_USE_WORKFLOW=false
 
-<<<<<<< HEAD
-# Conversational Concierge chat on the home page — off by default (panel hidden).
-VITE_USE_CONCIERGE=false
-=======
 # Conversational Concierge chat on the home page — ON by default; set "false" to hide it.
 VITE_USE_CONCIERGE=true
 
@@ -208,7 +187,6 @@ VITE_USE_CONCIERGE=true
 # country fields and the result hides duties).
 VITE_SHIPPING_SCOPE=worldwide
 VITE_DOMESTIC_COUNTRY=US
->>>>>>> bb14dc57886387914f768c3f801095be4d752cd1
 ```
 
 Without `VITE_SUPABASE_ANON_KEY` the Supabase client cannot initialize
@@ -239,12 +217,8 @@ their deployed equivalents.
 | `pnpm preview` | Serve the built `dist/` locally to smoke-test the production bundle. |
 | `pnpm typecheck` | `tsc -b --noEmit` — catch type errors without emitting JS. |
 | `pnpm lint` | ESLint across the repo. |
-<<<<<<< HEAD
-| `pnpm test` | Vitest one-shot run (53 tests, jsdom). |
-=======
 | `pnpm test` | Vitest one-shot run (63 tests across 14 files, jsdom). |
 | `pnpm test:e2e` | Playwright browser smoke (`e2e-web/`) against a live dev server — the real web-flow. |
->>>>>>> bb14dc57886387914f768c3f801095be4d752cd1
 | `pnpm test:watch` | Vitest in watch mode. |
 
 ### Tests
@@ -256,20 +230,11 @@ Vitest + `@testing-library/react` (jsdom), under `src/`:
 | `lib/advisor-api.test.ts` | The advisor error taxonomy → friendly copy, `shipmentToContext` mapping, input cap. |
 | `lib/http.test.ts` | The shared fetch wrapper: correlation headers, bearer JWT, idempotency key, RFC-7807 `HttpError`, 204. |
 | `hooks/useShippingQuotes.test.ts` / `hooks/useSavedOptions.test.ts` | The Java-vs-Supabase backend toggle and signed-in/out state. |
-<<<<<<< HEAD
-| `components/advisor/AdvisorPanel.test.tsx` | Provenance badges, citations, graceful error states, client validation. |
-=======
->>>>>>> bb14dc57886387914f768c3f801095be4d752cd1
 | `components/shipping/CompareSection.test.tsx` | Loading state + comparison grid render from a fixture. |
 | `lib/workflow-api.test.ts` | Workflow error taxonomy → friendly copy, advisory `verdictLabel` mapping, input cap. |
 | `components/workflow/WorkflowPage.test.tsx` | Submit → suspended (`awaiting_review`) result + review panel → clear → completed. |
 | `state/shipmentDraft.test.ts` | The shared-draft merge rules (conflict/provenance) + the concierge adapters (diff-only back-channel). |
 | `components/advisor/ConciergePanel.test.tsx` | Chat → reply, the back-channel patch fills the form, and the chat-vs-form conflict confirm. |
-<<<<<<< HEAD
-
-The TS response interfaces in `src/lib/advisor-api.ts`, `src/lib/workflow-api.ts`, and `src/components/shipping/compare.types.ts` are also asserted against the backend schemas from `ShipSmart-Test/contract/`.
-
-=======
 | `components/advisor/FloatingShipmentAdvisor.test.tsx` | The floating advisor launcher: open/close, shipment-context wiring, and panel switching. |
 | `components/workflow/WorkflowForm.test.tsx` | Workflow request form validation + submit payload shape. |
 | `state/useShipmentDraftFormSync.test.tsx` | The form ⇄ draft binding hook: form edits write through, chat patches reflect back without clobbering. |
@@ -283,7 +248,6 @@ The TS response interfaces in `src/lib/advisor-api.ts`, `src/lib/workflow-api.ts
 **production build** (`pnpm build`). It runs on Node 20 with a dummy Supabase env, so the
 build and tests pass without any real secrets.
 
->>>>>>> bb14dc57886387914f768c3f801095be4d752cd1
 ---
 
 ## Deployment (Render)
@@ -362,13 +326,8 @@ lockstep:
 The shipment **form** and a conversational **concierge chat** are two views over **one
 shared shipment draft**: type "Atlanta → Seattle, 12 lb" in the chat and the route /
 weight fields fill in; fill the form and the chat already knows and won't re-ask. Gated by
-<<<<<<< HEAD
-`VITE_USE_CONCIERGE` (off by default → the panel is hidden and the form behaves exactly as
-before). The **bulk of this feature lives in this repo.**
-=======
 `VITE_USE_CONCIERGE` (**on by default**; set to `false` to hide the panel so the form behaves
 exactly as before). The **bulk of this feature lives in this repo.**
->>>>>>> bb14dc57886387914f768c3f801095be4d752cd1
 
 How it works:
 
@@ -394,13 +353,8 @@ How it works:
   resets both the draft and the chat thread.
 
 Backed by the **Conversational Concierge** chat endpoint (`POST /api/v1/concierge/chat`, a
-<<<<<<< HEAD
-slot-filling `ConversationState`) in ShipSmart-API. **Backward-compatible and off by
-default** — with the chat hidden, the form behaves exactly as it does today.
-=======
 slot-filling `ConversationState`) in ShipSmart-API. **Backward-compatible** — set
 `VITE_USE_CONCIERGE=false` and, with the chat hidden, the form behaves exactly as it does today.
->>>>>>> bb14dc57886387914f768c3f801095be4d752cd1
 
 ---
 
