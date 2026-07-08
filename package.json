@@ -11,7 +11,12 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "test": "vitest run",
+<<<<<<< HEAD
     "test:watch": "vitest"
+=======
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
+>>>>>>> bb14dc57886387914f768c3f801095be4d752cd1
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",
@@ -32,6 +37,10 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
+<<<<<<< HEAD
+=======
+    "@playwright/test": "^1.61.1",
+>>>>>>> bb14dc57886387914f768c3f801095be4d752cd1
     "@testing-library/jest-dom": "^6.6.0",
     "@testing-library/react": "^16.0.0",
     "@types/node": "^22.16.5",

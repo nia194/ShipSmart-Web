@@ -55,7 +55,6 @@ export const CityInput = ({
   const handleClear = () => {
     onChange("");
     setFocused(true);
-
     setTimeout(() => {
       finalInputRef.current?.focus();
     }, 0);

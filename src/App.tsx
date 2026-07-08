@@ -113,7 +113,11 @@ function AppHeader() {
     >
       <div
         style={{
+<<<<<<< HEAD
           maxWidth: 1600,
+=======
+          maxWidth: 760,
+>>>>>>> bb14dc57886387914f768c3f801095be4d752cd1
           height: 86,
           margin: "0 auto",
           padding: "0 20px",

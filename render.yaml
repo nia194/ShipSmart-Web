@@ -25,8 +25,11 @@ services:
         value: https://shipsmart-api-java.onrender.com
       - key: VITE_PYTHON_API_BASE_URL
         value: https://shipsmart-api-python.onrender.com
+<<<<<<< HEAD
       - key: VITE_APP_ENV
         value: production
+=======
+>>>>>>> bb14dc57886387914f768c3f801095be4d752cd1
       # Feature flags — Java backend default in production.
       # Set any to "false" to fall back to Supabase edge functions.
       - key: VITE_USE_JAVA_QUOTES
@@ -35,3 +38,10 @@ services:
         value: "true"
       - key: VITE_USE_JAVA_BOOKING_REDIRECT
         value: "true"
+<<<<<<< HEAD
+=======
+      # Conversational concierge on the homepage. ON by default (opt-out);
+      # set "false" to hide it. Requires CONCIERGE_ENABLED=true on the API.
+      - key: VITE_USE_CONCIERGE
+        value: "true"
+>>>>>>> bb14dc57886387914f768c3f801095be4d752cd1

@@ -206,7 +206,6 @@ function MiniFact({ label, value }: { label: string; value: string }) {
       >
         {label}
       </div>
-
       <div
         style={{
           fontSize: 12,
@@ -260,7 +259,6 @@ function CompactBreakdown({ svc }: { svc: ShippingService }) {
           >
             Estimated price details
           </div>
-
           <div
             style={{
               marginTop: 2,
@@ -470,7 +468,6 @@ const Detail = ({ svc, open, bookUrl, onBook }: DetailProps) => {
               >
                 {svc.promo.pct} off applied
               </div>
-
               <div
                 style={{
                   fontSize: 11.5,
@@ -652,13 +649,11 @@ export const Row = ({
   dest,
 }: RowProps) => {
   const [justSaved, setJustSaved] = useState(false);
-
   const isOpen = openId === svc.id;
   const tb = TIER_BADGES[svc.tier] || TIER_BADGES.STANDARD;
 
   const handleSave = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-
     onSave(svc);
 
     if (!isSaved) {
@@ -783,7 +778,6 @@ export const Row = ({
           <div style={{ fontSize: 13, fontWeight: 700, color: "#374151" }}>
             {svc.transitDays}d
           </div>
-
           <div style={{ fontSize: 10, color: "#9ca3af" }}>{svc.date}</div>
         </div>
 
