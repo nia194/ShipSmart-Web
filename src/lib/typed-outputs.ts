@@ -14,6 +14,20 @@ export type RiskTier = "read" | "quote" | "write" | "high";
 export type PatchSource = "user_text" | "tool_result" | "quote_data";
 export type ResponseType = "answer" | "form_patch" | "ask_followup" | "refusal";
 
+// Product Roadmap §6 vocabulary (the structured assistant contract).
+export type AssistantIntent =
+  | "form_fill"
+  | "form_edit"
+  | "quote_search"
+  | "recommendation"
+  | "compare_options"
+  | "policy_question"
+  | "package_help"
+  | "tracking_question"
+  | "general_question";
+export type ApplyPolicy = "auto" | "confirm" | "none";
+export type ResultLabel = "Cheapest" | "Fastest" | "Best value" | "Safest";
+
 // ── Backend shapes (snake_case, matching ShipSmart-API) ──────────────────────
 
 export interface SourceCitation {
@@ -58,6 +72,63 @@ export interface ToolCallPolicy {
   requires_confirmation: boolean;
 }
 
+// ── Typed result union (Product Roadmap §6) — rendered as a card per type ─────
+export interface NextQuestion {
+  field: string;
+  text: string;
+}
+
+export interface ShippingOptionResult {
+  type: "shipping_option";
+  label: ResultLabel;
+  quote_id: string;
+  carrier: string;
+  service_name: string;
+  price_usd: number;
+  transit_days: number;
+  estimated_delivery_date?: string | null;
+  reason: string;
+  badges: string[];
+}
+
+export interface ComparisonResult {
+  type: "comparison";
+  options: string[];
+  summary: string;
+}
+
+export interface MissingInfoResult {
+  type: "missing_info";
+  missing_fields: string[];
+  next_question: string;
+}
+
+export interface PolicyAnswerResult {
+  type: "policy_answer";
+  answer: string;
+  sources: SourceCitation[];
+}
+
+export type AssistantResult =
+  | ShippingOptionResult
+  | ComparisonResult
+  | MissingInfoResult
+  | PolicyAnswerResult;
+
+export interface ToolCallTrace {
+  name: string;
+  args_shape: string[];
+  status: string;
+  latency_ms: number;
+}
+
+export interface AssistantAudit {
+  model: string;
+  provider: string;
+  selection_method: string;
+  latency_ms: number;
+}
+
 export interface AssistantResponse {
   type: ResponseType;
   message: string;
@@ -66,4 +137,14 @@ export interface AssistantResponse {
   form_patch?: FormPatchProposal | null;
   risk_tier: RiskTier;
   requires_confirmation: boolean;
+  // ── Product Roadmap §6 additions (additive; old fields keep their meaning) ──
+  schema_version: string;
+  intent?: AssistantIntent | null;
+  apply_policy: ApplyPolicy;
+  confidence: number;
+  missing_fields: string[];
+  next_question?: NextQuestion | null;
+  result?: AssistantResult | null;
+  tool_calls: ToolCallTrace[];
+  audit?: AssistantAudit | null;
 }
