@@ -90,4 +90,6 @@ export const pythonApi = {
   /** Persisted conversation for recall after a page reload (server memory). */
   conciergeHistory: (sessionId: string) =>
     `${apiConfig.pythonApiBaseUrl}/api/v1/concierge/${sessionId}`,
+  /** Explicit user feedback on an AI reply (Layer-6 online eval loop). */
+  feedback: () => `${apiConfig.pythonApiBaseUrl}/api/v1/feedback`,
 } as const;
