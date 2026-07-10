@@ -45,3 +45,8 @@ jobs:
 
       - name: Build (vite)
         run: pnpm build
+
+      # Dependency hygiene (guardrails §5.9). Report-only (high severity) so a
+      # pre-existing advisory informs triage without blocking the build.
+      - name: Dependency audit (pnpm audit, report-only)
+        run: pnpm audit --audit-level high || true
