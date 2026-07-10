@@ -9,6 +9,7 @@ import type {
   CompareOption,
   Priority,
 } from "@/components/shipping/compare.types";
+import { AssistantResultView } from "@/components/assistant/AssistantResult";
 import { friendlyAdvisorError } from "@/lib/advisor-api";
 import {
   CONCIERGE_MAX_MESSAGE_LENGTH,
@@ -37,6 +38,9 @@ type Turn = {
   reply?: string;
   dispatched?: string | null;
   patchedFields?: ScalarField[];
+  // Structured assistant contract (Product Roadmap §6). When the backend emits it,
+  // the turn renders typed cards instead of prose; null keeps today's text render.
+  assistant?: import("@/lib/typed-outputs").AssistantResponse | null;
 };
 
 const INITIAL_SUGGESTIONS = [
@@ -583,6 +587,7 @@ export default function ConciergePanel({
                 ...turn,
                 reply: response.reply,
                 dispatched: response.dispatched_to,
+                assistant: response.assistant ?? null,
               }
             : turn,
         ),
@@ -741,7 +746,11 @@ export default function ConciergePanel({
 
                 {turn.reply ? (
                   <div className="ss-concierge-message assistant">
-                    {turn.reply}
+                    {turn.assistant ? (
+                      <AssistantResultView response={turn.assistant} />
+                    ) : (
+                      turn.reply
+                    )}
 
                     {turn.dispatched && DISPATCH_LABEL[turn.dispatched] && (
                       <div

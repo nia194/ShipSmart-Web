@@ -68,6 +68,43 @@ describe("ConciergePanel", () => {
     expect(screen.getByTestId("destination").textContent).toBe("Seattle, WA");
   });
 
+  it("renders the typed assistant contract as cards when the backend emits it (P0)", async () => {
+    vi.spyOn(conciergeApi, "postConciergeChat").mockResolvedValue({
+      ...reply({}),
+      assistant: {
+        type: "answer",
+        message: "Cheapest option:",
+        sources: [],
+        actions: [],
+        risk_tier: "read",
+        requires_confirmation: false,
+        schema_version: "1",
+        apply_policy: "none",
+        confidence: 0.7,
+        missing_fields: [],
+        tool_calls: [],
+        result: {
+          type: "shipping_option",
+          label: "Cheapest",
+          quote_id: "Q-100",
+          carrier: "FedEx",
+          service_name: "Ground",
+          price_usd: 42.5,
+          transit_days: 3,
+          reason: "",
+          badges: [],
+        },
+      },
+    });
+    renderPanel();
+    await send("cheapest option");
+
+    await waitFor(() =>
+      expect(screen.getByTestId("result-shipping-option")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("$42.50")).toBeInTheDocument();
+  });
+
   it("surfaces a chat-vs-form conflict instead of overwriting, then resolves on choice", async () => {
     vi.spyOn(conciergeApi, "postConciergeChat").mockResolvedValue(reply({ origin: "Boston, MA" }));
     renderPanel();
