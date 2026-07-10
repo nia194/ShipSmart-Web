@@ -11,6 +11,7 @@
 import { pythonApi } from "@/config/api";
 import type { AdvisorSource, ReplyContext } from "@/lib/advisor-api";
 import { http } from "@/lib/http";
+import type { AssistantResponse } from "@/lib/typed-outputs";
 
 export interface ConciergeState {
   slots: Record<string, unknown>;
@@ -29,6 +30,10 @@ export interface ConciergeResponse {
   sources: AdvisorSource[];
   decisions: string[];
   provider: string;
+  // Structured assistant contract (Product Roadmap §6). Present only when the
+  // backend has ASSISTANT_CONTRACT_V1 enabled; the UI renders types when it is,
+  // and plain prose when it is null.
+  assistant?: AssistantResponse | null;
 }
 
 export interface ConciergeMessage {
