@@ -21,6 +21,8 @@ import type {
   CompareOption,
   Priority,
 } from "@/components/shipping/compare.types";
+import { AssistantResultView } from "@/components/assistant/AssistantResult";
+import type { AssistantResponse } from "@/lib/typed-outputs";
 
 type ChatMessage = {
   id: string;
@@ -31,6 +33,8 @@ type ChatMessage = {
   question?: string;
   // Set on a user turn that replied to an earlier message (for the subtle indicator).
   replyTo?: { role: "user" | "assistant"; snippet: string };
+  // Structured assistant contract (Product Roadmap §6): render typed cards when present.
+  assistant?: AssistantResponse | null;
 };
 
 const REPLY_SNIPPET_MAX = 90;
@@ -859,12 +863,18 @@ function AssistantAnswer({
   text,
   options,
   question,
+  assistant,
 }: {
   text: string;
   options: CompareOption[];
   question?: string;
+  assistant?: AssistantResponse | null;
 }) {
   const [expanded, setExpanded] = useState(false);
+  // Render types, not prose, when the backend emits the structured contract (P0).
+  if (assistant) {
+    return <AssistantResultView response={assistant} />;
+  }
 
   const clean = cleanAssistantText(text);
   const tooLong = clean.length > 650;
@@ -1409,6 +1419,7 @@ export default function FloatingShipmentAdvisor({
           content: response.answer,
           sources: response.sources ?? [],
           decisionPath: response.decision_path ?? null,
+          assistant: response.assistant ?? null,
           question,
         },
       ]);
@@ -1685,6 +1696,7 @@ export default function FloatingShipmentAdvisor({
                           text={message.content}
                           options={safeOptions}
                           question={message.question}
+                          assistant={message.assistant}
                         />
                         <SourceDisclosure sources={message.sources} />
                       </div>

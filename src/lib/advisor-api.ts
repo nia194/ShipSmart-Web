@@ -62,6 +62,9 @@ export interface ShippingAdvisorResponse {
   sources: AdvisorSource[];
   context_used: boolean;
   decision_path?: DecisionPath | null;
+  // Structured assistant contract (Product Roadmap §6); present only when the
+  // backend has ASSISTANT_CONTRACT_V1 on. The advisor renders types when it is.
+  assistant?: import("@/lib/typed-outputs").AssistantResponse | null;
 }
 
 export interface TrackingAdvisorResponse {

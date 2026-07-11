@@ -59,6 +59,40 @@ describe("FloatingShipmentAdvisor reply-to", () => {
     });
   });
 
+  it("renders the typed assistant contract as cards when the backend emits it (P0)", async () => {
+    vi.mocked(advisorApi.postShippingAdvice).mockResolvedValueOnce({
+      answer: "Ground is cheapest for a non-urgent box.",
+      reasoning_summary: "",
+      tools_used: [],
+      sources: [],
+      context_used: true,
+      decision_path: null,
+      assistant: {
+        type: "answer",
+        message: "Ground is cheapest for a non-urgent box.",
+        sources: [],
+        actions: [],
+        risk_tier: "read",
+        requires_confirmation: false,
+        schema_version: "1",
+        apply_policy: "none",
+        confidence: 0.7,
+        missing_fields: [],
+        grid_actions: [],
+        tool_calls: [],
+        result: {
+          type: "policy_answer",
+          answer: "Ground is cheapest for a non-urgent box.",
+          sources: [{ source: "policies/carrier-comparison.md" }],
+        },
+      },
+    });
+    renderAdvisor();
+    await ask("Is insurance included for fragile items?");
+    expect(await screen.findByTestId("result-policy-answer")).toBeTruthy();
+    expect(screen.getByText(/policies\/carrier-comparison.md/)).toBeTruthy();
+  });
+
   it("replies to an assistant message and sends reply_to to the backend", async () => {
     renderAdvisor();
     await ask("Is insurance included for these?");
