@@ -411,7 +411,7 @@ export default function ConciergePanel({
   quoteOptions = [],
   selectedPriority,
 }: ConciergePanelProps) {
-  const { draft, applyPatch, conflicts, resolveConflict, reset } =
+  const { draft, applyPatch, undoLastPatch, canUndo, conflicts, resolveConflict, reset } =
     useShipmentDraft();
 
   const [thread, setThread] = useState<Turn[]>([]);
@@ -723,7 +723,7 @@ export default function ConciergePanel({
           </>
         ) : (
           <div className="ss-concierge-messages">
-            {thread.map((turn) => (
+            {thread.map((turn, turnIndex) => (
               <div key={turn.id}>
                 <div className="ss-concierge-message user">
                   {turn.question}
@@ -741,6 +741,25 @@ export default function ConciergePanel({
                     }}
                   >
                     Filled: {fieldList(turn.patchedFields)}
+                    {canUndo && turnIndex === thread.length - 1 && (
+                      <button
+                        type="button"
+                        onClick={() => undoLastPatch()}
+                        style={{
+                          marginLeft: 8,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: "#2563eb",
+                          textDecoration: "underline",
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          padding: 0,
+                        }}
+                      >
+                        Undo
+                      </button>
+                    )}
                   </div>
                 )}
 

@@ -30,6 +30,10 @@ type DraftPatch = Partial<Record<ScalarField, unknown>>;
 interface State {
   draft: ShipmentDraft;
   conflicts: PendingConflict[];
+  // Single-level undo snapshot: the draft as it was BEFORE the last assistant
+  // patch (Product Roadmap §6 — "Undo restores the pre-patch draft"). A manual
+  // edit invalidates it (null), so Undo only ever reverses the assistant.
+  previousDraft: ShipmentDraft | null;
 }
 
 type Action =
@@ -54,6 +58,9 @@ type Action =
       choice: "current" | "incoming";
     }
   | {
+      type: "UNDO_PATCH";
+    }
+  | {
       type: "RESET";
     };
 
@@ -64,6 +71,7 @@ function createInitialState(initialItems: PackageItem[] = []): State {
       items: initialItems,
     },
     conflicts: [],
+    previousDraft: null,
   };
 }
 
@@ -88,6 +96,7 @@ function reducer(state: State, action: Action): State {
       return {
         draft: result.draft,
         conflicts,
+        previousDraft: null, // a manual field edit invalidates the assistant undo
       };
     }
 
@@ -98,6 +107,7 @@ function reducer(state: State, action: Action): State {
           ...state.draft,
           items: action.items,
         },
+        previousDraft: null,
       };
     }
 
@@ -119,6 +129,18 @@ function reducer(state: State, action: Action): State {
       return {
         draft: result.draft,
         conflicts: [...keptConflicts, ...result.conflicts],
+        previousDraft: state.draft, // snapshot BEFORE the patch, for a single undo
+      };
+    }
+
+    case "UNDO_PATCH": {
+      if (!state.previousDraft) {
+        return state;
+      }
+      return {
+        draft: state.previousDraft,
+        conflicts: [],
+        previousDraft: null,
       };
     }
 
@@ -155,6 +177,7 @@ function reducer(state: State, action: Action): State {
           },
         } as ShipmentDraft,
         conflicts,
+        previousDraft: state.previousDraft,
       };
     }
 
@@ -182,6 +205,11 @@ export interface ShipmentDraftApi {
   setItems: (items: PackageItem[]) => void;
 
   applyPatch: (patch: DraftPatch, source?: FieldSource) => void;
+
+  /** Reverse the last assistant patch (Product Roadmap §6). No-op if nothing to undo. */
+  undoLastPatch: () => void;
+  /** True when the last change was an assistant patch that can still be undone. */
+  canUndo: boolean;
 
   resolveConflict: (
     field: ScalarField,
@@ -242,6 +270,10 @@ export function ShipmentDraftProvider({
     [],
   );
 
+  const undoLastPatch = useCallback(() => {
+    dispatch({ type: "UNDO_PATCH" });
+  }, []);
+
   const resolveConflict = useCallback(
     (field: ScalarField, choice: "current" | "incoming") => {
       dispatch({
@@ -267,15 +299,19 @@ export function ShipmentDraftProvider({
       setField,
       setItems,
       applyPatch,
+      undoLastPatch,
+      canUndo: state.previousDraft !== null,
       resolveConflict,
       reset,
     }),
     [
       state.draft,
       state.conflicts,
+      state.previousDraft,
       setField,
       setItems,
       applyPatch,
+      undoLastPatch,
       resolveConflict,
       reset,
     ],
