@@ -46,7 +46,7 @@ const randomHex = (bytes: number): string => {
 
 const newTraceparent = () => `00-${randomHex(16)}-${randomHex(8)}-01`;
 
-async function bearer(): Promise<string | undefined> {
+export async function bearer(): Promise<string | undefined> {
   try {
     const { data } = await supabase.auth.getSession();
     return data.session?.access_token;

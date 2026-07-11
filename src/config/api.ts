@@ -92,4 +92,6 @@ export const pythonApi = {
     `${apiConfig.pythonApiBaseUrl}/api/v1/concierge/${sessionId}`,
   /** Explicit user feedback on an AI reply (Layer-6 online eval loop). */
   feedback: () => `${apiConfig.pythonApiBaseUrl}/api/v1/feedback`,
+  /** SSE streaming assistant — grounded answer streamed token-by-token. */
+  assistantStream: () => `${apiConfig.pythonApiBaseUrl}/api/v1/assistant/stream`,
 } as const;
