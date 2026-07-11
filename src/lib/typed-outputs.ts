@@ -115,6 +115,32 @@ export type AssistantResult =
   | MissingInfoResult
   | PolicyAnswerResult;
 
+// ── Grid action bus (Product Roadmap §6/§12) — typed, allowlisted grid controls ──
+export type SortBy = "cheapest" | "fastest" | "best_value";
+
+export interface GridFilter {
+  price_under?: number | null;
+  arrives_by?: string | null;
+  carrier_not: string[];
+}
+
+export interface SortGridAction {
+  type: "sort_grid";
+  by: SortBy;
+}
+
+export interface FilterGridAction {
+  type: "filter_grid";
+  grid_filter: GridFilter;
+}
+
+export interface SuggestAction {
+  type: "suggest";
+  chips: string[];
+}
+
+export type GridAction = SortGridAction | FilterGridAction | SuggestAction;
+
 export interface ToolCallTrace {
   name: string;
   args_shape: string[];
@@ -145,6 +171,7 @@ export interface AssistantResponse {
   missing_fields: string[];
   next_question?: NextQuestion | null;
   result?: AssistantResult | null;
+  grid_actions: GridAction[];
   tool_calls: ToolCallTrace[];
   audit?: AssistantAudit | null;
 }
