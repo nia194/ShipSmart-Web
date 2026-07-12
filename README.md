@@ -26,16 +26,23 @@ and the Python AI layer
 **Stack:** React 19 · TypeScript 5.9 (`strict`) · Vite 5 · Tailwind + shadcn/ui
 · Radix UI · TanStack Query 5 · React Router · Supabase JS
 
+> **Metric convention:** structural counts are facts (87 tests, 12 flags,
+> 0 `as any`/`eval`/`innerHTML`); latency/bundle figures are **(target)**.
+
 ---
 
 ## Table of contents
 
 - [The ShipSmart ecosystem](#the-shipsmart-ecosystem)
-- [Engineering highlights](#engineering-highlights)
-- [Architecture](#architecture)
+- [Architecture (HLD)](#architecture-hld)
+- [Component tree](#component-tree)
 - [The typed assistant contract](#the-typed-assistant-contract)
 - [Safe, undoable form mutation](#safe-undoable-form-mutation)
 - [Streaming & perceived speed](#streaming--perceived-speed)
+- [State management](#state-management)
+- [Module design (LLD)](#module-design-lld)
+- [Performance, safety & degradation](#performance-safety--degradation)
+- [Deployment topology](#deployment-topology)
 - [Running locally](#running-locally)
 - [Available scripts](#available-scripts)
 - [Configuration (feature flags)](#configuration-feature-flags)
@@ -62,67 +69,323 @@ that snapshots each component at a pinned commit (see its `COMPONENTS.yml`).
 
 ---
 
-## Engineering highlights
+## Architecture (HLD)
 
-| | Capability | Why it's interesting |
-|---|---|---|
-| 🧾 | **Renders types, not prose** | The copilot's answer is a typed `AssistantResponse` with a discriminated `result` union — one card per variant. The legacy prose parser survives only as a flagged-off fallback (a strangler mid-retirement). |
-| ↩️ | **Policy-gated patches + Undo** | A `FormPatch` is auto-applied, confirmed, or never applied — decided by rule-derived confidence (`ai-trust.ts`). Every assistant apply snapshots the draft; `undoLastPatch()` restores it; a manual edit invalidates the snapshot, so Undo only ever reverses the assistant. |
-| 🌊 | **SSE streaming client** | `fetch` + `ReadableStream` + `parseSseBuffer`: progressive `onDelta` text, a final typed envelope on `onDone`, graceful `onError` — plus an instant local-answer path from already-loaded grid data. |
-| 🎛️ | **Typed grid action bus** | `sort_grid` / `filter_grid` / `suggest` flow through a pure reducer — the model requests, deterministic code executes. |
-| 🔌 | **One fetch wrapper** | `lib/http.ts` mints `X-Request-Id` + `traceparent`, attaches the Supabase bearer, parses RFC-7807 problems, and maps errors to friendly copy — no second fetch pattern exists. |
-| 🚦 | **12 ops flags** | Copilot surfaces, **three Java strangler cutovers** (quotes / saved options / booking redirect), market scope, API bases — every integration is a dial with instant rollback. |
-| 🧼 | **Verifiably clean** | `strict` TS with **0** `as any`, **0** `dangerouslySetInnerHTML`, **0** `eval` across the tree. |
+**Figure 1 — app composition.** Everything the copilot can do flows through
+three framework-free modules — `typed-outputs` (what it may say), `ai-trust`
+(what may apply), `grid-actions` (what the grid may do) — the most heavily
+unit-tested seams in the app.
+
+```mermaid
+flowchart TB
+    MAIN["main.tsx"] --> APP["App: Router + QueryClientProvider + AuthContext + ShipmentDraftProvider"]
+    subgraph LIB["lib/ (framework-free core)"]
+        HTTP["http.ts — X-Request-Id + traceparent + bearer + RFC-7807 + friendly errors"]
+        CLI["advisor-api · concierge-api · workflow-api · feedback-api"]
+        SSE["assistant-stream.ts — parseSseBuffer / onDelta / onDone / onError"]
+        TO["typed-outputs.ts — TS mirror of API Pydantic (CI parity)"]
+        TRUST["ai-trust.ts — responseNeedsConfirmation"]
+        GA["grid-actions.ts — pure reducer"]
+    end
+    subgraph STATE["state/"]
+        SD["ShipmentDraftContext — useReducer: APPLY_PATCH snapshot · UNDO_PATCH · conflicts · provenance"]
+        SYNC[useShipmentDraftFormSync]
+    end
+    subgraph HOOKS["hooks/"]
+        H1["useShippingQuotes (TanStack Query)"]
+        H2[useSavedOptions]
+    end
+    subgraph UI["components/"]
+        AR["assistant/AssistantResult — typed card renderer"]
+        COP["FloatingShipmentAdvisor (flag-gated copilot) + tryBuildLocalAnswer"]
+        FORM["shipment-form/ steps"]
+        GRID["shipping/ QuoteRow · CompareSection · SmartResultsSection"]
+        WKF["workflow/ WorkflowForm · ReviewPanel · WorkflowResult"]
+    end
+    PAGES["pages: Home · Auth · Saved · Workflow · NotFound"]
+    APP --> LIB
+    APP --> STATE
+    APP --> PAGES
+    PAGES --> UI
+    UI --> HOOKS
+    UI --> STATE
+    UI --> LIB
+```
 
 ---
 
-## Architecture
+## Component tree
 
+**Figure 2 — key components: state owners vs consumers, and which flag gates
+which surface.**
+
+```mermaid
+flowchart TB
+    APP[App] --> HP[HomePage]
+    APP --> AU["AuthPage (Supabase)"]
+    APP --> SP[SavedPage]
+    APP --> WP["WorkflowPage (VITE_USE_WORKFLOW)"]
+    HP --> HERO[HeroSection]
+    HP --> SPF["ShipmentProgressForm (owner: draft via context)"]
+    SPF --> LS[LocationStep]
+    SPF --> PDS[PackageDetailsStep]
+    SPF --> DS[DateStep]
+    HP --> QRS["QuoteResultsSection (owner: quotes via TanStack)"]
+    QRS --> QR[QuoteRow]
+    QRS --> CS[CompareSection]
+    QRS --> SRS[SmartResultsSection]
+    HP --> FSA["FloatingShipmentAdvisor (VITE_USE_CONCIERGE variant switch)"]
+    FSA --> ARV["AssistantResult — consumes typed union"]
+    WP --> WF[WorkflowForm]
+    WP --> RP["ReviewPanel (HITL)"]
+    WP --> WR[WorkflowResult]
+    SP --> SSIM["SaveSignInModal (auth-on-save)"]
 ```
-  App (Router + QueryClientProvider + AuthContext + ShipmentDraftProvider)
-   ├─ lib/http.ts ──────────── one wrapper: correlation + bearer + RFC-7807
-   │    ├─ advisor-api · concierge-api · workflow-api · feedback-api
-   │    └─ assistant-stream.ts ── SSE reader (parseSseBuffer → onDelta/onDone)
-   ├─ lib/typed-outputs.ts ─── TS mirror of the API contract (CI parity-tested)
-   ├─ lib/ai-trust.ts ──────── advisory-until-confirmed gate
-   ├─ lib/grid-actions.ts ──── pure reducer (typed action bus)
-   ├─ state/ShipmentDraftContext ── useReducer: APPLY_PATCH snapshots ·
-   │                                UNDO_PATCH · conflicts · "from chat" provenance
-   ├─ hooks/useShippingQuotes · useSavedOptions   (TanStack Query)
-   └─ components/
-        assistant/AssistantResult ── typed card renderer
-        advisor|concierge/FloatingShipmentAdvisor ── flag-gated copilot
-        shipment-form/ · shipping/ (grid) · workflow/ (HITL surface)
-```
+
+---
 
 ## The typed assistant contract
 
-`lib/typed-outputs.ts` mirrors the API's Pydantic models **field-for-field**:
-`{ intent, apply_policy, confidence, result, grid_actions, tool_calls, audit }`
-with `result` a discriminated union — `shipping_option | comparison |
-missing_info | policy_answer`. `AssistantResult` renders one card per variant;
-when the backend emits the contract, `parseAssistantSections` is bypassed
-entirely. The mirror is **parity-tested in CI** by ShipSmart-Test — a rename on
-either side fails the build, not a user session.
+**Figure 3 — types render; the prose parser is bypassed.**
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as Copilot component
+    participant A as API /assistant
+    participant R as AssistantResult
+    U->>C: "compare the two cheapest"
+    C->>A: POST (draft context + signed state)
+    A-->>C: typed AssistantResponse (ASSISTANT_CONTRACT_V1)
+    C->>R: result union
+    alt result = comparison
+        R-->>U: comparison card
+    else shipping_option
+        R-->>U: option card
+    else missing_info
+        R-->>U: targeted question card
+    else policy_answer
+        R-->>U: cited policy card
+    end
+    Note over C: parseAssistantSections (legacy prose path) NOT invoked — strangler fallback only
+```
+
+**Figure 4 — the render-path decision (the strangler in one diagram).**
+
+```mermaid
+flowchart LR
+    R[response arrives] --> Q{"typed contract present?"}
+    Q -->|yes| T["AssistantResult renders the discriminated union — one card per variant"]
+    Q -->|no| P["legacy parseAssistantSections prose path (flagged-off fallback, being retired)"]
+    T --> DONE[UI]
+    P --> DONE
+```
+
+`lib/typed-outputs.ts` mirrors the API's Pydantic models **field-for-field**
+and is **parity-tested in CI** by ShipSmart-Test — a rename on either side
+fails the build, not a user session.
+
+---
 
 ## Safe, undoable form mutation
 
-- **Auto / confirm / never** per patch, from rule-derived confidence + field
-  risk — a price the model *typed* is never authoritative without a quote
-  reference.
-- **Undo, precisely scoped:** `APPLY_PATCH` snapshots `previousDraft`;
-  `UNDO_PATCH` restores it; `canUndo === (previousDraft !== null)`; manual
-  edits invalidate the snapshot.
-- **Conflicts surfaced, never clobbered** — with per-field "from chat"
-  provenance.
+**Figure 5 — auto / confirm / never, with snapshot Undo.** A price the model
+*typed* is never authoritative without a quote reference; Undo can only ever
+reverse the assistant, never the user.
+
+```mermaid
+sequenceDiagram
+    participant AI as AssistantResponse
+    participant T as ai-trust
+    participant ST as ShipmentDraft store
+    participant U as User
+    AI->>T: FormPatch + confidence + risk
+    alt auto-apply
+        T->>ST: APPLY_PATCH (previousDraft snapshot taken)
+        ST-->>U: patch summary + Undo affordance
+    else needs confirmation
+        T-->>U: confirm dialog
+        U->>ST: approve -> APPLY_PATCH (snapshot)
+    else never apply
+        T-->>U: advisory only — no mutation
+    end
+    U->>ST: undoLastPatch()
+    ST->>ST: UNDO_PATCH -> restore previousDraft
+    Note over ST: manual edit invalidates snapshot -> canUndo=false
+```
+
+---
 
 ## Streaming & perceived speed
 
-Three layers stack: an **instant local answer** (`tryBuildLocalAnswer`) from
-already-loaded grid data when possible → **progressive SSE deltas** → the
-**final typed envelope** swapping in structured cards. Transport failures
-degrade to `onError`; the client never throws. Vendor code is split into
+**Figure 6 — three layers stack: instant local answer → progressive deltas →
+typed envelope.** Transport failures degrade to `onError`; the client never
+throws.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as Copilot
+    participant L as tryBuildLocalAnswer
+    participant S as streamAssistant
+    participant A as API /assistant/stream
+    U->>C: question
+    C->>L: try local answer from loaded grid data
+    alt answerable locally
+        L-->>U: instant answer (0 network)
+    else needs the model
+        C->>S: streamAssistant(handlers)
+        S->>A: fetch (ReadableStream)
+        loop frames
+            A-->>S: data: {"delta": ...}
+            S->>S: parseSseBuffer -> complete frames + rest
+            S-->>U: onDelta progressive render
+        end
+        A-->>S: data: {"done": true, "assistant": {...}}
+        S-->>C: onDone typed envelope -> swap in cards
+    end
+```
+
+---
+
+## State management
+
+**Figure 7 — the draft store lifecycle (state machine).**
+
+```mermaid
+stateDiagram-v2
+    [*] --> Draft: user fills form / chat extracts
+    Draft --> Draft: field update (provenance from-chat tracked)
+    Draft --> Patched: APPLY_PATCH (previousDraft snapshot)
+    Patched --> Draft: UNDO_PATCH (restore snapshot)
+    Patched --> Draft: manual edit (snapshot invalidated, canUndo=false)
+    Draft --> Conflict: chat value != form value
+    Conflict --> Draft: user resolves (never silent clobber)
+```
+
+**Figure 8 — auth exactly when needed.**
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant B as Bookmark/save
+    participant M as SaveSignInModal
+    participant SB as Supabase
+    U->>B: save option
+    alt session exists
+        B->>SB: persist (bearer)
+    else no session
+        B->>M: open modal
+        U->>M: sign in
+        M->>SB: auth
+        SB-->>B: session -> save proceeds
+    end
+```
+
+---
+
+## Module design (LLD)
+
+**Figure 9 — the `lib/` seams.** `typed-outputs` is the single source the
+other seams import — and the file the cross-repo parity test locks against the
+API.
+
+```mermaid
+classDiagram
+    class http {
+        +request(path, init)
+        -mint X-Request-Id + traceparent
+        -attach Supabase bearer
+        -parse RFC-7807 ProblemDetail
+        +friendlyAdvisorError(code)
+    }
+    class typedOutputs {
+        <<types>>
+        AssistantResponse
+        ResultUnion: shipping_option | comparison | missing_info | policy_answer
+        FormPatch
+        GridAction
+    }
+    class aiTrust {
+        +responseNeedsConfirmation(resp) bool
+    }
+    class gridActions {
+        <<pure>>
+        +reduce(state, GridAction) state
+    }
+    class assistantStream {
+        +streamAssistant(req, handlers)
+        +parseSseBuffer(buffer) events_rest
+    }
+    http <.. assistantStream
+    typedOutputs <.. aiTrust
+    typedOutputs <.. gridActions
+    typedOutputs <.. assistantStream
+```
+
+---
+
+## Performance, safety & degradation
+
+**Perceived-speed budget (target):**
+
+| Milestone | Budget *(target)* |
+|---|---|
+| Local answer (grid data) | < 50 ms |
+| First streamed token | < 1 s |
+| Typed envelope (done) | < 3 s |
+| Route TTI (warm) | < 2 s |
+
+```mermaid
+xychart-beta
+    title "Perceived-speed budget in ms (target)"
+    x-axis ["local-answer", "first-token", "typed-done", "route-TTI"]
+    y-axis "ms (target)" 0 --> 3000
+    bar [50, 1000, 3000, 2000]
+```
+
+*Honest caveat (fact):* Render free tier cold-starts the backend ~30–60 s on
+first hit; the UI communicates rather than hides it. Vendor code is split into
 long-lived chunks (`react-vendor` / `supabase` / `query`).
+
+**Safety & hygiene (facts):** `strict` TS + `noUnusedLocals`/`Parameters`;
+**0** `as any` · **0** `dangerouslySetInnerHTML` · **0** `eval`
+(grep-verified); ESLint 9 flat config.
+
+| Threat | Control |
+|---|---|
+| Malicious model output → DOM | typed rendering; zero `innerHTML`/`eval` |
+| Silent form manipulation | apply-policy + confirm + undo + provenance |
+| Fabricated price display | prices render from grid/quote data, not prose |
+| Token mishandling | single auth-aware `http` wrapper |
+
+**Degradation matrix (coded behaviors):**
+
+| Condition | Behavior |
+|---|---|
+| `VITE_USE_CONCIERGE` off | advisor variant renders; concierge surface absent |
+| `VITE_USE_WORKFLOW` off | workflow page/feature hidden |
+| Java cutover flags off | legacy quote/saved/booking paths used (strangler) |
+| SSE transport failure | `onError` fallback — non-streamed answer path |
+| Typed contract absent | legacy prose parser fallback |
+
+---
+
+## Deployment topology
+
+**Figure 10 — production layout.** 12 `VITE_*` flags make every integration a
+dial: capability rollout, strangler cutovers, market scope.
+
+```mermaid
+flowchart LR
+    U[Browser] --> W["Render static hosting: shipsmart-web"]
+    W -->|"VITE_PYTHON_API_BASE_URL"| A["shipsmart-api-python"]
+    W -->|"VITE_JAVA_API_BASE_URL"| J["shipsmart (Java)"]
+    W --> SB["Supabase (auth)"]
+    W --> EF["Supabase edge functions"]
+```
+
+---
 
 ## Running locally
 
